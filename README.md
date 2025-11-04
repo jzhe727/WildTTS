@@ -45,4 +45,5 @@ pretrained_models/CosyVoice2-0.5B
 ```
 
 * Test run
-Running template.py *should* generate some reasonable audio.
+
+Running template.py (in the backend folder) *should* generate some reasonable audio.
