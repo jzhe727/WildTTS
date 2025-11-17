@@ -32,7 +32,7 @@ conda install -c conda-forge 'ffmpeg<7'
 * Install requirements for Cosyvoice 2. Can also follow the README in the CosyVoice repository.
 
 ```
-cd backend/Cosyvoice
+cd backend/CosyVoice
 pip install -r requirements.txt 
 ```
 
