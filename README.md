@@ -13,7 +13,7 @@ Git (with LFS): [tutorial for installation](https://docs.github.com/en/repositor
 * Clone the repository.
 
 ```
-git clone --recursive https://github.com/jzhe727/WildTTS.git
+git clone --recursive git@github.com:jzhe727/WildTTS.git
 cd WildTTS
 git submodule update --init --recursive
 ```
