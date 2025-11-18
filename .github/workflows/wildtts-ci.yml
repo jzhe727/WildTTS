@@ -18,17 +18,23 @@ jobs:
     
 
     steps:
-      - name: Checkout repository (with submodules)
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
           sudo rm -rf /usr/local/.ghcup
-
+          
+      - name: Show disk usage
+        run: |
+          df -h
+          du -sh /usr/local/lib/* || true
+      
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
       - name: Set up Conda (wildtts env)
         uses: conda-incubator/setup-miniconda@v3
         with:
