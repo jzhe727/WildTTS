@@ -15,12 +15,19 @@ on:
 jobs:
   test-wildtts:
     runs-on: ubuntu-latest
+    
 
     steps:
       - name: Checkout repository (with submodules)
         uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/.ghcup
 
       - name: Set up Conda (wildtts env)
         uses: conda-incubator/setup-miniconda@v3
