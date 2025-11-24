@@ -52,7 +52,8 @@ jobs:
           printf "machine huggingface.co\nlogin hf\npassword %s\n" "$HF_TOKEN" > ~/.netrc
           chmod 600 ~/.netrc
           # Log in for huggingface CLI as well (optional)
-          huggingface-cli login --token "$HF_TOKEN"
+          git config --global credential.helper store
+          hf auth login --token "$HF_TOKEN" --add-to-git-credential
 
       - name: Initialize and update submodules (pull private HuggingFace submodule)
         run: |
