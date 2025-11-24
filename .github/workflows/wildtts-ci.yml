@@ -1,0 +1,77 @@
+name: WildTTS / CosyVoice2 CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "backend/**"
+      - ".github/workflows/wildtts-ci.yml"
+  pull_request:
+    branches: [ main ]
+    paths:
+      - "backend/**"
+      - ".github/workflows/wildtts-ci.yml"
+
+jobs:
+  test-wildtts:
+    runs-on: ubuntu-latest
+    
+
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/.ghcup
+          
+      - name: Show disk usage
+        run: |
+          df -h
+          du -sh /usr/local/lib/* || true
+      
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Set up Conda (wildtts env)
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          activate-environment: wildtts
+          auto-activate-base: false
+          python-version: "3.10"
+          channels: conda-forge,defaults
+
+      - name: Install ffmpeg for torchaudio
+        shell: bash -l {0}
+        run: |
+          conda install -y -c conda-forge "ffmpeg<7"
+
+      - name: Install CosyVoice dependencies
+        shell: bash -l {0}
+        working-directory: backend/CosyVoice
+        run: |
+          pip install -r requirements.txt
+
+      - name: Install Git LFS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git-lfs
+          git lfs install
+
+      - name: Download CosyVoice2-0.5B pretrained checkpoint
+        shell: bash -l {0}
+        working-directory: backend/CosyVoice
+        run: |
+          mkdir -p pretrained_models
+          if [ ! -d pretrained_models/CosyVoice2-0.5B ]; then
+            git clone https://www.modelscope.cn/iic/CosyVoice2-0.5B.git \
+              pretrained_models/CosyVoice2-0.5B
+          fi
+
+      - name: Smoke test (run template.py)
+        shell: bash -l {0}
+        working-directory: backend
+        run: |
+          python template.py
