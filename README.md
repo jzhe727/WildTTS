@@ -47,3 +47,21 @@ pretrained_models/CosyVoice2-0.5B
 * Test run
 
 Running template.py (in the backend folder) *should* generate some reasonable audio.
+
+## Evaluation
+
+To keep dependencies isolated, we will make multiple environments and change between them for generation vs. evaluation.
+
+Environment names must be exact for the script to work.
+
+```
+conda create -n wildtts-versa python=3.10 -y
+conda activate wildtts-versa
+```
+
+```
+cd eval/versa
+
+pip install .
+```
+
