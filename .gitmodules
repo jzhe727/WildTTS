@@ -1,9 +1,6 @@
 [submodule "backend/CosyVoice"]
 	path = backend/CosyVoice
 	url = https://github.com/FunAudioLLM/CosyVoice.git
-[submodule "eval/UTMOS-demo"]
-	path = eval/UTMOS-demo
-	url = https://huggingface.co/spaces/sarulab-speech/UTMOS-demo
 [submodule "eval/titw-test"]
 	path = eval/titw-test
 	url = https://huggingface.co/datasets/jzhe727/titw-test
