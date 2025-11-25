@@ -223,6 +223,8 @@ frontend/[Bb]uilds/
 frontend/[Ll]ogs/
 frontend/[Uu]ser[Ss]ettings/
 frontend/*.log
+artifacts/
+frontend/artifacts/
 
 # By default unity supports Blender asset imports, *.blend1 blender files do not need to be commited to version control.
 *.blend1
