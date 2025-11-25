@@ -32,7 +32,8 @@ public class UnityAudioManager : MonoBehaviour
     public GameObject recordObject2;  // 녹음 중 상태 오브젝트 (검정색)
 
     [Header("Synthesize UI")]
-    public Button synthesizeButton;  // 합성 버튼 - 누르면 녹음된 음성을 합성하여 자동 재생
+    public Button synthesizeButton;  // 합성 버튼 - 누르면 텍스트를 합성하여 자동 재생
+    [SerializeField] private string synthesisText = "Hi ENSF classmates this is demo for our project";  // 합성할 텍스트
 
     [Header("Animation")]
     public Animator characterAnimator;  // 캐릭터 애니메이터 - 말할 때 애니메이션 제어
@@ -339,45 +340,47 @@ public class UnityAudioManager : MonoBehaviour
     #region ===== FUNCTION 3: Request & Play Synthesized Voice =====
 
     /// <summary>
-    /// Send audio to Python for synthesis and play the result.
+    /// Request synthesized voice from text and play the result.
     /// </summary>
-    /// <param name="audioData">Input audio bytes to synthesize</param>
-    /// <param name="filename">Filename for the input audio</param>
-    public void RequestSynthesizedVoice(byte[] audioData, string filename)
+    /// <param name="text">The text to be synthesized into speech</param>
+    public void RequestSynthesizedVoice(string text)
     {
-        StartCoroutine(SynthesizeAndPlayCoroutine(audioData, filename));
+        if (string.IsNullOrEmpty(text))
+        {
+            OnError?.Invoke("Text cannot be empty");
+            return;
+        }
+        StartCoroutine(SynthesizeAndPlayCoroutine(text));
     }
 
     /// <summary>
-    /// Send the last recorded voice for synthesis and play the result.
+    /// Synthesize text using default text and play the result.
     /// </summary>
     public void SynthesizeRecordedVoice()
     {
-        if (recordedClip != null)
+        if (string.IsNullOrEmpty(synthesisText))
         {
-            byte[] audioData = AudioClipToWav(recordedClip);
-            StartCoroutine(SynthesizeAndPlayCoroutine(audioData, $"{userId}_recording.wav"));
+            OnError?.Invoke("Synthesis text is not set");
+            return;
         }
-        else if (!string.IsNullOrEmpty(lastRecordedFilePath) && File.Exists(lastRecordedFilePath))
-        {
-            byte[] audioData = File.ReadAllBytes(lastRecordedFilePath);
-            StartCoroutine(SynthesizeAndPlayCoroutine(audioData, Path.GetFileName(lastRecordedFilePath)));
-        }
-        else
-        {
-            OnError?.Invoke("No recorded voice available to synthesize");
-        }
+        StartCoroutine(SynthesizeAndPlayCoroutine(synthesisText));
     }
 
-    private IEnumerator SynthesizeAndPlayCoroutine(byte[] audioData, string filename)
+    /// <summary>
+    /// Synthesize text to speech and play the result.
+    /// </summary>
+    /// <param name="text">The text to be synthesized into speech</param>
+    private IEnumerator SynthesizeAndPlayCoroutine(string text)
     {
-        OnStatusUpdate?.Invoke("Sending audio for synthesis...");
+        OnStatusUpdate?.Invoke("Sending text for synthesis...");
 
+        // Create form with text field and user_id
         WWWForm form = new WWWForm();
-        form.AddBinaryData("audio_file", audioData, filename, "audio/wav");
+        form.AddField("text", text);
+        form.AddField("user_id", userId);  // Add user_id as form field for embedding
 
-        // Include user_id to use their embedding for synthesis
-        string url = $"{serverUrl}/audio/synthesize?user_id={userId}";
+        // Include user_id as query parameter to use their embedding for synthesis
+        string url = $"{serverUrl}/audio/synthesize";
 
         using (UnityWebRequest www = UnityWebRequest.Post(url, form))
         {
@@ -387,10 +390,17 @@ public class UnityAudioManager : MonoBehaviour
             {
                 OnStatusUpdate?.Invoke("Synthesis complete! Playing...");
                 
-                // Get synthesized audio
+                // Get synthesized audio as binary response
                 byte[] synthesizedAudio = www.downloadHandler.data;
                 
-                // Get filename from header
+                if (synthesizedAudio == null || synthesizedAudio.Length == 0)
+                {
+                    OnError?.Invoke("Received empty audio data");
+                    Debug.LogError("Received empty audio data");
+                    yield break;
+                }
+
+                // Get filename from header or use default
                 string synthesizedFilename = www.GetResponseHeader("X-Synthesized-Filename") ?? "synthesized.wav";
                 Debug.Log($"Received synthesized audio: {synthesizedFilename} ({synthesizedAudio.Length} bytes)");
 
