@@ -52,6 +52,7 @@ jobs:
         with:
           projectPath: frontend
           targetPlatform: StandaloneWindows64
+          versioning: None  
 
       # Output artifact
       - uses: actions/upload-artifact@v4
