@@ -209,4 +209,4 @@ __marimo__/
 
 # testing artifacts
 backend/*.wav
-
+eval/titw_generated/*.wav

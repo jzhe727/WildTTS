@@ -44,6 +44,11 @@ git clone https://www.modelscope.cn/iic/CosyVoice2-0.5B.git \
 pretrained_models/CosyVoice2-0.5B
 ```
 
+Additionally install CUDA runtime for GPU inference
+```
+conda install cuda -c nvidia/label/cuda-12.1.0 -y
+```
+
 * Test run
 
 Running template.py (in the backend folder) *should* generate some reasonable audio.
