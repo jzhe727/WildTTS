@@ -49,7 +49,13 @@ Additionally install CUDA runtime for GPU inference
 conda install cuda -c nvidia/label/cuda-12.1.0 -y
 ```
 
-* Test run
+For fish-audio-sdk
+
+```
+pip install fish-audio-sdk
+
+```
+* Test run needs an API key
 
 Running template.py (in the backend folder) *should* generate some reasonable audio.
 
