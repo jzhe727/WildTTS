@@ -210,3 +210,9 @@ __marimo__/
 # testing artifacts
 backend/*.wav
 eval/titw_generated/*.wav
+
+
+# ignore changes to versa
+eval/versa/
+eval/versa_cache/
+

@@ -1,0 +1,13 @@
+# VERSA Configuration for Comprehensive UTMOS Evaluation
+# Includes multiple pseudo-subjective MOS prediction metrics
+
+# Pseudo subjective metrics for quality assessment
+- name: pseudo_mos
+  predictor_types: ["utmos", "dnsmos", "plcmos"]
+  predictor_args:
+    utmos:
+      fs: 16000  # Universal Test MOS - naturalness prediction
+    dnsmos:
+      fs: 16000  # DNS MOS - noise suppression quality
+    plcmos:
+      fs: 16000  # PLC MOS - packet loss concealment quality

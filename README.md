@@ -70,3 +70,16 @@ cd eval/versa
 pip install .
 ```
 
+Install CUDA runtime for GPU metric calculation
+```
+conda install cuda -c nvidia/label/cuda-12.8.0 -y
+```
+
+### Testing the metrics calculater
+```
+conda activate wildtts-versa
+
+cd eval
+
+PRED_DIR=metrics_testing ./eval_versa.sh comprehensive --verbose"
+```
