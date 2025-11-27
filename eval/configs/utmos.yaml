@@ -1,0 +1,10 @@
+# VERSA Configuration for UTMOS Evaluation
+# This config file is designed for evaluating TTS generated audio quality using UTMOS metric
+
+# UTMOS (Universal Test MOS) - Pseudo-subjective MOS prediction
+# Predicts Mean Opinion Score (1-5 scale) for naturalness
+- name: pseudo_mos
+  predictor_types: ["utmos"]
+  predictor_args:
+    utmos:
+      fs: 16000  # Sampling frequency in Hz

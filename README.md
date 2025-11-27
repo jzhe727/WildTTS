@@ -44,6 +44,42 @@ git clone https://www.modelscope.cn/iic/CosyVoice2-0.5B.git \
 pretrained_models/CosyVoice2-0.5B
 ```
 
+Additionally install CUDA runtime for GPU inference
+```
+conda install cuda -c nvidia/label/cuda-12.1.0 -y
+```
+
 * Test run
 
 Running template.py (in the backend folder) *should* generate some reasonable audio.
+
+## Evaluation
+
+To keep dependencies isolated, we will make multiple environments and change between them for generation vs. evaluation.
+
+Environment names must be exact for the script to work.
+
+```
+conda create -n wildtts-versa python=3.10 -y
+conda activate wildtts-versa
+```
+
+```
+cd eval/versa
+
+pip install .
+```
+
+Install CUDA runtime for GPU metric calculation
+```
+conda install cuda -c nvidia/label/cuda-12.8.0 -y
+```
+
+### Testing the metrics calculater
+```
+conda activate wildtts-versa
+
+cd eval
+
+PRED_DIR=metrics_testing ./eval_versa.sh comprehensive --verbose"
+```
