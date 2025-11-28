@@ -319,3 +319,4 @@ frontend/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Core/Property
 
 # Auto-generated scenes by play mode tests
 frontend/[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+eval/titw_generated_subset/
