@@ -1,6 +1,6 @@
 import sys
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]="" # force CPU, comment out to auto-detect GPU if available
+os.environ["DS_ACCELERATOR"]="cpu" # force CPU, comment out to auto-detect GPU if available
 import torchaudio
 
 cosyvoice_path = os.path.join(os.path.dirname(__file__), 'CosyVoice')

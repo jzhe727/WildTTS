@@ -6,4 +6,4 @@
 	url = https://huggingface.co/datasets/jzhe727/titw-test
 [submodule "eval/versa"]
 	path = eval/versa
-	url = git@github.com:wavlab-speech/versa.git
+	url = https://github.com/wavlab-speech/versa.git

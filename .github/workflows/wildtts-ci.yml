@@ -88,8 +88,18 @@ jobs:
               pretrained_models/CosyVoice2-0.5B
           fi
 
-      - name: Smoke test (run template.py)
+      - name: Install WildTTS backend dependencies (fish-audio-sdk)
         shell: bash -l {0}
         working-directory: backend
         run: |
-          python template.py
+          pip install -r requirements.txt
+
+      - name: Smoke test (run integration tests)
+        shell: bash -l {0}
+        working-directory: backend
+        env:
+          FISH_API_KEY: ${{ secrets.FISH_API_KEY }}
+        run: |
+          python cosyvoice_test.py
+          python fishaudio_test.py
+          python test_interface.py
