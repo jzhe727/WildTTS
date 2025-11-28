@@ -11,6 +11,11 @@ on:
     paths:
       - "frontend/**"
       - ".github/workflows/GameCI.yml"
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 jobs:
   build:
     name: Test&build
