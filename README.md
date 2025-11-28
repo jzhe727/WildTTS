@@ -57,7 +57,7 @@ pip install fish-audio-sdk
 ```
 * Test run needs an API key
 
-Running template.py (in the backend folder) *should* generate some reasonable audio.
+Running cosyvoice_test.py (in the backend folder) *should* generate some reasonable audio.
 
 ## Evaluation
 
