@@ -20,5 +20,5 @@ jobs:
               run: echo "This is a test on ARC runner."
             - name: allocate resources
               run: 
-                srun --partition=cpu2019,cpu2022,cpu2023 --pty --cpus-per-task=4 --mem=16G --time=00:30:00 bash -c "echo 'Allocated resources on ARC'"
+                srun --partition=cpu2019,cpu2022,cpu2023 --pty --cpus-per-task=2 --mem=0 --time=00:30:00 bash -c "echo 'Allocated resources on ARC'"
               
