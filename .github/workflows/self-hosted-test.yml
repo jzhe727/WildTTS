@@ -14,7 +14,7 @@ jobs:
             - name: test step
               run: echo "This is a test on self-hosted runner."
     test-arc-job:
-        runs-on: arc
+        runs-on: [self-hosted, arc]
         steps:
             - name: test_echo
               run: echo "This is a test on ARC runner."
