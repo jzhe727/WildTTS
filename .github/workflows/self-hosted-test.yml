@@ -1,0 +1,24 @@
+name: WildTTS / Self-Hosted Test
+
+on:
+    push:
+        branches:
+            - self-hosted-worker
+            - main
+        paths:
+            - .github/workflows/self-hosted-test.yml
+jobs:
+    test-local-job:
+        runs-on: self-hosted
+        steps:
+            - name: test step
+              run: echo "This is a test on self-hosted runner."
+    test-arc-job:
+        runs-on: [self-hosted, arc]
+        steps:
+            - name: test_echo
+              run: echo "This is a test on ARC runner."
+            - name: allocate resources
+              run: 
+                srun --partition=cpu2019,cpu2022,cpu2023 --pty --cpus-per-task=2 --mem=0 --time=00:30:00 bash -c "echo 'Allocated resources on ARC'"
+              
