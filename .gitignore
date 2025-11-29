@@ -209,7 +209,11 @@ __marimo__/
 
 # testing artifacts
 backend/*.wav
-eval/titw_generated/*.wav
+eval/titw_generated_subset/
+
+# generation and eval metric artifacts
+eval/*_generated/
+eval/*results*/
 
 
 # ignore changes to versa
@@ -319,4 +323,4 @@ frontend/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Core/Property
 
 # Auto-generated scenes by play mode tests
 frontend/[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
-eval/titw_generated_subset/
+
