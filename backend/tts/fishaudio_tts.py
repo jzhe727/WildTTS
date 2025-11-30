@@ -120,7 +120,7 @@ class FishAudioTTS(BaseTTS):
     
     def __del__(self):
         """Cleanup voice models on destruction if auto_cleanup is enabled."""
-        if self.auto_cleanup_voices and self.cache_voices:
+        if getattr(self, 'auto_cleanup_voices', False) and getattr(self, 'cache_voices', False):
             self.cleanup_cached_voices()
     
     def synthesize(
