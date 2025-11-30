@@ -18,6 +18,14 @@ tts.synthesize(
     style_text=ref_transcript  # Optional for FishAudio
 )
 
+tts.synthesize(
+    text="Hello world, testing testing 1 2 3",
+    prompt_wav_path=ref_path,
+    output_wav_path="output_interface_fishaudio_no_style.wav",
+    style_text=ref_transcript,
+    enhance_audio_quality=True
+)
+
 cosyvoice_tts = create_tts(
     engine='cosyvoice',
     model_path='./CosyVoice/pretrained_models/CosyVoice2-0.5B',
