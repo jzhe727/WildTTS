@@ -12,12 +12,10 @@ METADATA_DIR="titw-test/metadata"
 TEST_WAV_DIR="titw-test"
 OUTPUT_DIR="titw_generated"
 MODEL_DIR="../backend/CosyVoice/pretrained_models/CosyVoice2-0.5B"
-SPEED=1.0
 
 # Parse command line arguments
 USE_FP16=false
 USE_JIT=false
-POSTPROCESS=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -29,16 +27,8 @@ while [[ $# -gt 0 ]]; do
             USE_JIT=true
             shift
             ;;
-        --postprocess)
-            POSTPROCESS=true
-            shift
-            ;;
         --output_dir)
             OUTPUT_DIR="$2"
-            shift 2
-            ;;
-        --speed)
-            SPEED="$2"
             shift 2
             ;;
         --help|-h)
@@ -47,15 +37,12 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --fp16              Use FP16 precision (requires GPU)"
             echo "  --jit               Use JIT-optimized model (faster)"
-            echo "  --postprocess       Apply post-processing to output audio"
             echo "  --output_dir DIR    Output directory (default: titw_generated)"
-            echo "  --speed FLOAT       Speed factor (default: 1.0)"
             echo "  --help, -h          Show this help message"
             echo ""
             echo "Examples:"
             echo "  $0                          # Basic generation"
             echo "  $0 --fp16 --jit             # GPU-accelerated generation"
-            echo "  $0 --postprocess            # With audio post-processing"
             exit 0
             ;;
         *)
@@ -72,7 +59,6 @@ CMD="$CMD --metadata_dir $METADATA_DIR"
 CMD="$CMD --test_wav_dir $TEST_WAV_DIR"
 CMD="$CMD --output_dir $OUTPUT_DIR"
 CMD="$CMD --model_dir $MODEL_DIR"
-CMD="$CMD --speed $SPEED"
 
 if [ "$USE_FP16" = true ]; then
     CMD="$CMD --fp16"
@@ -80,10 +66,6 @@ fi
 
 if [ "$USE_JIT" = true ]; then
     CMD="$CMD --load_jit"
-fi
-
-if [ "$POSTPROCESS" = true ]; then
-    CMD="$CMD --postprocess_output"
 fi
 
 # Print configuration
@@ -94,10 +76,8 @@ echo "Metadata dir:  $METADATA_DIR"
 echo "Test wav dir:  $TEST_WAV_DIR"
 echo "Output dir:    $OUTPUT_DIR"
 echo "Model dir:     $MODEL_DIR"
-echo "Speed:         $SPEED"
 echo "FP16:          $USE_FP16"
 echo "JIT:           $USE_JIT"
-echo "Postprocess:   $POSTPROCESS"
 echo "========================================"
 echo ""
 echo "Command: $CMD"

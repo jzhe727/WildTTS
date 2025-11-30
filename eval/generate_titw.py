@@ -16,23 +16,17 @@ Format compatibility with Versa toolkit:
 - Outputs can be used directly with Versa evaluation toolkit
 """
 
-import os
 import sys
 import argparse
 from pathlib import Path
 from tqdm import tqdm
-import torch
-import torchaudio
-import librosa
 
-# Add CosyVoice to path
+# Add backend to path for TTS interface
 SCRIPT_DIR = Path(__file__).resolve().parent
-COSYVOICE_DIR = SCRIPT_DIR.parent / 'backend' / 'CosyVoice'
-sys.path.insert(0, str(COSYVOICE_DIR))
-sys.path.insert(0, str(COSYVOICE_DIR / 'third_party' / 'Matcha-TTS'))
+BACKEND_DIR = SCRIPT_DIR.parent / 'backend'
+sys.path.insert(0, str(BACKEND_DIR))
 
-from cosyvoice.cli.cosyvoice import CosyVoice2
-from cosyvoice.utils.file_utils import load_wav
+from tts import create_tts
 
 
 def load_metadata(metadata_dir):
@@ -96,34 +90,6 @@ def load_metadata(metadata_dir):
     return metadata
 
 
-def postprocess_audio(speech, top_db=60, hop_length=220, win_length=440, max_val=0.8):
-    """
-    Post-process generated audio: trim silence and normalize.
-    
-    Args:
-        speech: torch.Tensor audio waveform
-        top_db: Decibel threshold for silence trimming
-        hop_length: Hop length for trimming
-        win_length: Window length for trimming
-        max_val: Maximum amplitude value for normalization
-        
-    Returns:
-        torch.Tensor: Processed audio
-    """
-    speech, _ = librosa.effects.trim(
-        speech.numpy(),
-        top_db=top_db,
-        frame_length=win_length,
-        hop_length=hop_length
-    )
-    speech = torch.from_numpy(speech)
-    
-    if speech.abs().max() > max_val:
-        speech = speech / speech.abs().max() * max_val
-    
-    return speech
-
-
 def generate_tts_audio(args):
     """
     Main function to generate TTS audio for all test utterances.
@@ -144,18 +110,16 @@ def generate_tts_audio(args):
     
     print("Note: Using each utterance as its own prompt for TITW reconstruction")
     
-    # Initialize CosyVoice2 model
+    # Initialize TTS engine using the unified interface
     print(f"Loading CosyVoice2 model from {args.model_dir}...")
-    cosyvoice = CosyVoice2(
-        str(args.model_dir),
+    tts = create_tts(
+        'cosyvoice',
+        model_path=str(args.model_dir),
         load_jit=args.load_jit,
         load_trt=args.load_trt,
         fp16=args.fp16
     )
     print("Model loaded successfully")
-    
-    # Set sample rate for prompt audio
-    prompt_sr = 16000
     
     # Generate audio for each utterance
     print("Generating TTS audio...")
@@ -177,40 +141,16 @@ def generate_tts_audio(args):
                 failed_utts.append(utt_id)
                 continue
             
-            # Load and preprocess prompt audio
-            prompt_speech_16k = load_wav(str(prompt_wav_path), prompt_sr)
-            
-            # Optionally postprocess prompt audio
-            if args.postprocess_prompt:
-                prompt_speech_16k = postprocess_audio(prompt_speech_16k)
-            
-            # Generate audio using zero-shot inference
-            output_audio = None
-            for output in cosyvoice.inference_zero_shot(
-                tts_text=tts_text,
-                prompt_text=prompt_text,
-                prompt_speech_16k=prompt_speech_16k,
-                stream=False,
-                speed=args.speed
-            ):
-                output_audio = output['tts_speech']
-            
-            if output_audio is None:
-                print(f"Warning: Failed to generate audio for {utt_id}")
-                failed_utts.append(utt_id)
-                continue
-            
-            # Postprocess generated audio
-            if args.postprocess_output:
-                output_audio = postprocess_audio(output_audio.squeeze(0))
-                output_audio = output_audio.unsqueeze(0)
-            
-            # Save audio file
+            # Output path for generated audio
             output_path = output_dir / f"{utt_id}.wav"
-            torchaudio.save(
-                str(output_path),
-                output_audio.cpu(),
-                cosyvoice.sample_rate
+            
+            # Generate audio using the TTS interface
+            tts.synthesize(
+                text=tts_text,
+                prompt_wav_path=str(prompt_wav_path),
+                output_wav_path=str(output_path),
+                style_text=prompt_text,
+                stream=False
             )
             
         except Exception as e:
@@ -219,7 +159,7 @@ def generate_tts_audio(args):
             continue
     
     # Summary
-    print(f"\nGeneration complete!")
+    print("\nGeneration complete!")
     print(f"Successfully generated: {len(metadata) - len(failed_utts)} files")
     print(f"Failed: {len(failed_utts)} files")
     
@@ -281,24 +221,6 @@ def main():
         help='Use FP16 precision'
     )
     
-    # Generation options
-    parser.add_argument(
-        '--speed',
-        type=float,
-        default=1.0,
-        help='Speed factor for generation'
-    )
-    parser.add_argument(
-        '--postprocess_prompt',
-        action='store_true',
-        help='Apply post-processing to prompt audio'
-    )
-    parser.add_argument(
-        '--postprocess_output',
-        action='store_true',
-        help='Apply post-processing to generated audio'
-    )
-    
     args = parser.parse_args()
     
     # Convert relative paths to absolute
@@ -315,9 +237,9 @@ def main():
     print(f"Test wav directory: {args.test_wav_dir}")
     print(f"Output directory: {args.output_dir}")
     print(f"Model directory: {args.model_dir}")
-    print(f"Speed: {args.speed}")
-    print(f"Postprocess prompt: {args.postprocess_prompt}")
-    print(f"Postprocess output: {args.postprocess_output}")
+    print(f"Load JIT: {args.load_jit}")
+    print(f"Load TRT: {args.load_trt}")
+    print(f"FP16: {args.fp16}")
     print("="*80)
     
     generate_tts_audio(args)
