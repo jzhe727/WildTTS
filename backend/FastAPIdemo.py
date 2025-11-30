@@ -2,9 +2,9 @@
 FastAPI Demo - Audio File Communication Backend for Unity Integration
 
 Unity Functions Supported:
-1. Record voice -> Send to Python for user embedding generation
+1. Record voice -> Send to Python for saving reference audio and text
 2. Play recorded voice (local, no server communication)
-3. Send text -> Get synthesized voice (text-to-speech with user embeddings) -> Play synthesized voice
+3. Send text -> Get synthesized voice (text-to-speech with reference audio) -> Play synthesized voice
 """
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
@@ -15,6 +15,9 @@ import uvicorn
 import os
 import json
 from datetime import datetime
+from typing import Optional
+
+from tts import create_tts, BaseTTS
 
 app = FastAPI(
     title="Audio API Demo",
@@ -25,112 +28,217 @@ app = FastAPI(
 # Directories for audio files
 UPLOAD_DIR = Path("uploaded_audio")
 SYNTHESIZED_DIR = Path("synthesized_audio")
-EMBEDDINGS_DIR = Path("user_embeddings")
+REFERENCE_DIR = Path("user_references")
 UPLOAD_DIR.mkdir(exist_ok=True)
 SYNTHESIZED_DIR.mkdir(exist_ok=True)
-EMBEDDINGS_DIR.mkdir(exist_ok=True)
+REFERENCE_DIR.mkdir(exist_ok=True)
+
+# TTS Engine Configuration
+# Set to 'cosyvoice' or 'fishaudio' based on your setup
+TTS_ENGINE = os.environ.get("TTS_ENGINE", "cosyvoice")
+TTS_MODEL_PATH = os.environ.get("TTS_MODEL_PATH", "CosyVoice/pretrained_models/CosyVoice2-0.5B")
+FISHAUDIO_API_KEY = os.environ.get("FISHAUDIO_API_KEY", None)
+
+# Initialize TTS engines (lazy loading) - cache for each engine type
+_tts_engines: dict[str, BaseTTS] = {}
+
+# Supported TTS models
+SUPPORTED_MODELS = ["cosyvoice", "fishaudio"]
 
 
-# ============== USER EMBEDDING GENERATION (PLACEHOLDER) ==============
-def generate_user_embedding(audio_data: bytes, user_id: str) -> dict:
+def get_tts_engine(model: Optional[str] = None) -> BaseTTS:
     """
-    Placeholder function for generating user voice embedding.
+    Get or initialize a TTS engine (lazy loading with caching).
+    
+    Args:
+        model: TTS model name ('cosyvoice' or 'fishaudio'). 
+               If None, uses the default TTS_ENGINE from environment.
+    
+    Returns:
+        BaseTTS engine instance
+    """
+    global _tts_engines
+    
+    # Use default engine if not specified
+    engine_name = model.lower() if model else TTS_ENGINE
+    
+    # Validate engine name
+    if engine_name not in SUPPORTED_MODELS:
+        raise ValueError(
+            f"Unsupported TTS model: {engine_name}. "
+            f"Supported models: {', '.join(SUPPORTED_MODELS)}"
+        )
+    
+    # Return cached engine if available
+    if engine_name in _tts_engines:
+        return _tts_engines[engine_name]
+    
+    # Initialize new engine
+    if engine_name == "cosyvoice":
+        _tts_engines[engine_name] = create_tts(
+            "cosyvoice",
+            model_path=TTS_MODEL_PATH,
+            load_jit=False,
+            load_trt=False,
+            load_vllm=False,
+            fp16=False
+        )
+    elif engine_name == "fishaudio":
+        _tts_engines[engine_name] = create_tts(
+            "fishaudio",
+            api_key=FISHAUDIO_API_KEY
+        )
+    
+    return _tts_engines[engine_name]
+
+
+# ============== USER REFERENCE MANAGEMENT ==============
+def save_user_reference(
+    audio_data: bytes,
+    user_id: str,
+    reference_text: str,
+    file_extension: str = ".wav"
+) -> dict:
+    """
+    Save user's reference audio and text for voice cloning.
     
     Args:
         audio_data: Raw bytes of the user's voice recording
         user_id: Unique identifier for the user
+        reference_text: Transcript of the reference audio (required for TTS)
+        file_extension: Audio file extension
     
     Returns:
-        Dictionary containing embedding data and metadata
-    
-    TODO: Replace this placeholder with actual embedding extraction
-    (e.g., speaker encoder, voice fingerprint model, etc.)
+        Dictionary containing reference data and metadata
     """
-    # ========================================
-    # PLACEHOLDER: Returns dummy embedding data
-    # Replace this section with your embedding extraction code:
-    # 
-    # Example integration points:
-    # - Speaker encoder models (e.g., GE2E, ECAPA-TDNN)
-    # - Voice fingerprint extraction
-    # - Custom voice feature extraction
-    # ========================================
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    # Placeholder: Generate dummy embedding (256-dimensional vector)
-    import hashlib
-    hash_obj = hashlib.sha256(audio_data)
-    hash_hex = hash_obj.hexdigest()
+    # Save reference audio file
+    audio_filename = f"{user_id}_reference_{timestamp}{file_extension}"
+    audio_path = REFERENCE_DIR / audio_filename
+    with open(audio_path, "wb") as f:
+        f.write(audio_data)
     
-    # Create a simple deterministic "embedding" from audio hash
-    embedding = [float(int(hash_hex[i:i+2], 16)) / 255.0 for i in range(0, 64, 2)]
-    
-    embedding_data = {
+    # Create reference metadata
+    reference_data = {
         "user_id": user_id,
-        "embedding": embedding,
-        "embedding_dim": len(embedding),
+        "audio_filename": audio_filename,
+        "audio_path": str(audio_path.absolute()),
+        "reference_text": reference_text,
         "audio_size_bytes": len(audio_data),
-        "created_at": datetime.now().isoformat(),
-        "model_version": "placeholder_v1"
+        "created_at": datetime.now().isoformat()
     }
     
-    return embedding_data
-
-
-# ============== AUDIO SYNTHESIS (PLACEHOLDER) ==============
-def synthesize_audio(text: str, user_embedding: dict = None) -> tuple[bytes, str]:
-    """
-    Placeholder function for text-to-speech synthesis.
+    # Save reference metadata as JSON
+    metadata_filename = f"{user_id}_reference_{timestamp}.json"
+    metadata_path = REFERENCE_DIR / metadata_filename
+    with open(metadata_path, "w", encoding="utf-8") as f:
+        json.dump(reference_data, f, indent=2, ensure_ascii=False)
     
-    Takes text input and reads it aloud using user embeddings for voice cloning.
+    return reference_data
+
+
+def get_user_reference(user_id: str) -> Optional[dict]:
+    """
+    Get the most recent reference data for a user.
+    
+    Args:
+        user_id: The user's unique identifier
+    
+    Returns:
+        Dictionary with reference data or None if not found
+    """
+    reference_files = list(REFERENCE_DIR.glob(f"{user_id}_reference_*.json"))
+    
+    if not reference_files:
+        return None
+    
+    # Get the most recent one
+    latest_file = max(reference_files, key=lambda p: p.stat().st_mtime)
+    
+    with open(latest_file, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+# ============== AUDIO SYNTHESIS ==============
+def synthesize_audio(
+    text: str,
+    user_reference: dict = None,
+    model: Optional[str] = None
+) -> tuple[bytes, str, str]:
+    """
+    Synthesize speech from text using the TTS engine.
+    
+    Uses the user's reference audio for voice cloning.
     
     Args:
         text: The text to be synthesized into speech
-        user_embedding: Optional user embedding for voice cloning
+        user_reference: User reference data containing audio path and text
+        model: TTS model name ('cosyvoice' or 'fishaudio'). Uses default if None.
     
     Returns:
-        Tuple of (synthesized_audio_bytes, output_filename)
+        Tuple of (synthesized_audio_bytes, output_filename, model_used)
     
-    TODO: Replace this placeholder with actual TTS synthesis logic
+    Raises:
+        ValueError: If user_reference is missing required data
     """
-    # ========================================
-    # PLACEHOLDER: Currently returns empty audio data
-    # Replace this section with your TTS synthesis code:
-    # 
-    # Example integration points:
-    # - Text-to-Speech with voice cloning (e.g., Coqui TTS, VALL-E, XTTS)
-    # - Use user_embedding to clone the user's voice
-    # - Generate audio from text input
-    # ========================================
+    if user_reference is None:
+        raise ValueError("User reference is required for synthesis")
     
-    # Placeholder: Generate empty audio data
-    # In real implementation, this would use TTS model with user_embedding
-    synthesized_data = b""  # Placeholder: empty audio
+    # Validate reference data
+    reference_audio_path = user_reference.get("audio_path")
+    reference_text = user_reference.get("reference_text")
     
-    # Generate output filename with timestamp
+    if not reference_audio_path or not os.path.exists(reference_audio_path):
+        raise ValueError(f"Reference audio not found: {reference_audio_path}")
+    
+    if not reference_text:
+        raise ValueError("Reference text is required for TTS synthesis")
+    
+    # Determine which model to use
+    model_used = model.lower() if model else TTS_ENGINE
+    
+    # Generate output filename with timestamp and model name
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    user_prefix = user_embedding.get("user_id", "default") if user_embedding else "default"
-    output_filename = f"{user_prefix}_synthesized_{timestamp}.wav"
+    user_prefix = user_reference.get("user_id", "default")
+    output_filename = f"{user_prefix}_{model_used}_synthesized_{timestamp}.wav"
+    output_path = SYNTHESIZED_DIR / output_filename
     
-    return synthesized_data, output_filename
+    # Get TTS engine and synthesize
+    tts_engine = get_tts_engine(model=model)
+    tts_engine.synthesize(
+        text=text,
+        prompt_wav_path=reference_audio_path,
+        output_wav_path=str(output_path),
+        style_text=reference_text
+    )
+    
+    # Read the synthesized audio
+    with open(output_path, "rb") as f:
+        synthesized_data = f.read()
+    
+    return synthesized_data, output_filename, model_used
 
 
-# ============== ENDPOINT 1: GENERATE USER EMBEDDING ==============
-@app.post("/audio/embedding")
-async def create_user_embedding(
+# ============== ENDPOINT 1: SAVE USER REFERENCE ==============
+@app.post("/audio/reference")
+async def create_user_reference(
     audio_file: UploadFile = File(...),
-    user_id: str = "default_user"
+    reference_text: str = Form(...),
+    user_id: str = Form("default_user")
 ):
     """
-    Receives user's voice recording and generates a voice embedding.
+    Receives user's voice recording and reference text for voice cloning.
     
-    Unity Function: Record user's voice -> Send to Python for embedding
+    Unity Function: Record user's voice -> Send to Python with transcript
     
     Args:
         audio_file: The user's voice recording (passed via form-data)
-        user_id: Unique identifier for the user (query parameter)
+        reference_text: Transcript of what is spoken in the audio (form field)
+        user_id: Unique identifier for the user (form field)
     
     Returns:
-        JSON response with embedding data and status
+        JSON response with reference data and status
     """
     try:
         # Validate file type
@@ -143,78 +251,67 @@ async def create_user_embedding(
                 detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}"
             )
         
+        # Validate reference text
+        if not reference_text or not reference_text.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Reference text (transcript of the audio) is required"
+            )
+        
         # Read audio data
         audio_data = await audio_file.read()
         
-        # Save the voice recording
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        saved_filename = f"{user_id}_voice_{timestamp}{file_extension}"
-        saved_path = UPLOAD_DIR / saved_filename
-        with open(saved_path, "wb") as f:
-            f.write(audio_data)
-        
-        # Generate embedding
-        embedding_data = generate_user_embedding(
+        # Save reference audio and metadata
+        reference_data = save_user_reference(
             audio_data=audio_data,
-            user_id=user_id
+            user_id=user_id,
+            reference_text=reference_text.strip(),
+            file_extension=file_extension
         )
-        
-        # Save embedding to file
-        embedding_filename = f"{user_id}_embedding_{timestamp}.json"
-        embedding_path = EMBEDDINGS_DIR / embedding_filename
-        with open(embedding_path, "w") as f:
-            json.dump(embedding_data, f, indent=2)
         
         return JSONResponse(
             status_code=200,
             content={
                 "status": "success",
-                "message": "User embedding generated successfully",
+                "message": "User reference saved successfully",
                 "user_id": user_id,
-                "embedding_file": embedding_filename,
-                "voice_file": saved_filename,
-                "embedding_dim": embedding_data["embedding_dim"],
-                "audio_size_bytes": len(audio_data)
+                "audio_filename": reference_data["audio_filename"],
+                "reference_text": reference_data["reference_text"],
+                "audio_size_bytes": reference_data["audio_size_bytes"],
+                "created_at": reference_data["created_at"]
             }
         )
     
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Embedding generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Reference saving failed: {str(e)}")
 
 
-@app.get("/audio/embedding/{user_id}")
-async def get_user_embedding(user_id: str):
+@app.get("/audio/reference/{user_id}")
+async def get_user_reference_endpoint(user_id: str):
     """
-    Retrieves the most recent embedding for a user.
+    Retrieves the most recent reference data for a user.
     
     Args:
         user_id: The user's unique identifier
     
     Returns:
-        JSON response with the user's embedding data
+        JSON response with the user's reference data
     """
-    # Find the most recent embedding file for this user
-    embedding_files = list(EMBEDDINGS_DIR.glob(f"{user_id}_embedding_*.json"))
+    reference_data = get_user_reference(user_id)
     
-    if not embedding_files:
+    if not reference_data:
         raise HTTPException(
             status_code=404,
-            detail=f"No embedding found for user '{user_id}'"
+            detail=f"No reference found for user '{user_id}'"
         )
-    
-    # Get the most recent one
-    latest_file = max(embedding_files, key=lambda p: p.stat().st_mtime)
-    
-    with open(latest_file, "r") as f:
-        embedding_data = json.load(f)
     
     return JSONResponse(
         status_code=200,
         content={
             "status": "success",
-            "embedding_data": embedding_data
+            "reference_data": reference_data
         }
     )
 
@@ -223,16 +320,18 @@ async def get_user_embedding(user_id: str):
 @app.post("/audio/synthesize")
 async def synthesize_and_return(
     text: str = Form(...),
-    user_id: str = Form(None)
+    user_id: str = Form(...),
+    model: Optional[str] = Form(None)
 ):
     """
-    Text-to-speech synthesis endpoint: Receives text, synthesizes speech using user embeddings.
+    Text-to-speech synthesis endpoint: Receives text, synthesizes speech using user's reference audio.
     
     Unity Function: Request synthesized voice -> Play synthesized voice
     
     Args:
-        text: The text to be synthesized into speech (form field or query parameter)
-        user_id: Optional user ID to use their embedding for voice cloning
+        text: The text to be synthesized into speech (form field)
+        user_id: User ID to use their reference audio for voice cloning (required)
+        model: TTS model name ('cosyvoice' or 'fishaudio'). Uses default if not specified.
     
     Returns:
         The synthesized audio file as binary response
@@ -244,30 +343,27 @@ async def synthesize_and_return(
                 detail="Text input is required for synthesis"
             )
         
-        # Load user embedding if user_id provided
-        user_embedding = None
-        if user_id:
-            embedding_files = list(EMBEDDINGS_DIR.glob(f"{user_id}_embedding_*.json"))
-            if embedding_files:
-                latest_file = max(embedding_files, key=lambda p: p.stat().st_mtime)
-                with open(latest_file, "r") as f:
-                    user_embedding = json.load(f)
-            else:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"No embedding found for user '{user_id}'. Please generate an embedding first."
-                )
+        # Validate model if provided
+        if model and model.lower() not in SUPPORTED_MODELS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported model: {model}. Supported models: {', '.join(SUPPORTED_MODELS)}"
+            )
         
-        # Synthesize audio from text
-        synthesized_data, output_filename = synthesize_audio(
-            text=text,
-            user_embedding=user_embedding
+        # Load user reference (required for voice cloning)
+        user_reference = get_user_reference(user_id)
+        if not user_reference:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No reference found for user '{user_id}'. Please upload a reference audio first."
+            )
+        
+        # Synthesize audio from text using user's reference
+        synthesized_data, output_filename, model_used = synthesize_audio(
+            text=text.strip(),
+            user_reference=user_reference,
+            model=model
         )
-        
-        # Save synthesized file
-        output_path = SYNTHESIZED_DIR / output_filename
-        with open(output_path, "wb") as f:
-            f.write(synthesized_data)
         
         # Determine media type based on output filename
         file_extension = Path(output_filename).suffix.lower()
@@ -289,7 +385,8 @@ async def synthesize_and_return(
                 "X-Synthesized-Filename": output_filename,
                 "X-Input-Text": text[:100],  # First 100 chars of text
                 "X-Output-Size": str(len(synthesized_data)),
-                "X-User-Id": user_id or "none"
+                "X-User-Id": user_id,
+                "X-Model-Used": model_used
             }
         )
     
@@ -378,7 +475,7 @@ async def list_audio_files():
     """
     uploaded_files = []
     synthesized_files = []
-    embedding_files = []
+    reference_files = []
     
     for file_path in UPLOAD_DIR.iterdir():
         if file_path.is_file():
@@ -394,9 +491,9 @@ async def list_audio_files():
                 "size_bytes": os.path.getsize(file_path)
             })
     
-    for file_path in EMBEDDINGS_DIR.iterdir():
+    for file_path in REFERENCE_DIR.iterdir():
         if file_path.is_file():
-            embedding_files.append({
+            reference_files.append({
                 "filename": file_path.name,
                 "size_bytes": os.path.getsize(file_path)
             })
@@ -407,8 +504,8 @@ async def list_audio_files():
             "status": "success",
             "uploaded_files": uploaded_files,
             "synthesized_files": synthesized_files,
-            "embedding_files": embedding_files,
-            "total_count": len(uploaded_files) + len(synthesized_files) + len(embedding_files)
+            "reference_files": reference_files,
+            "total_count": len(uploaded_files) + len(synthesized_files) + len(reference_files)
         }
     )
 
@@ -419,14 +516,17 @@ async def root():
     return {
         "status": "running",
         "message": "Audio API Demo is active",
-        "version": "3.0.0",
+        "version": "4.1.0",
+        "default_tts_engine": TTS_ENGINE,
+        "supported_models": SUPPORTED_MODELS,
         "unity_functions": {
-            "1_record_and_embed": "POST /audio/embedding - Record voice, generate embedding",
+            "1_save_reference": "POST /audio/reference - Upload reference audio + text for voice cloning",
             "2_playback_local": "No server communication needed",
-            "3_synthesize_and_play": "POST /audio/synthesize - Send text, get synthesized audio (TTS with user embeddings)"
+            "3_synthesize_and_play": "POST /audio/synthesize - Send text + model, get synthesized audio"
         },
         "other_endpoints": {
-            "get_embedding": "GET /audio/embedding/{user_id}",
+            "get_reference": "GET /audio/reference/{user_id}",
+            "get_models": "GET /audio/models - List supported TTS models",
             "upload": "POST /audio/upload",
             "download": "GET /audio/download/{filename}",
             "list": "GET /audio/list"
@@ -434,14 +534,45 @@ async def root():
     }
 
 
-# ============== TEST CODE ==============
-def test_embedding_generation(file_path: Path, user_id: str):
+@app.get("/audio/models")
+async def get_supported_models():
     """
-    Test function to generate user embedding from voice recording.
+    Returns the list of supported TTS models.
+    
+    Returns:
+        JSON with supported models and default model
+    """
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "success",
+            "default_model": TTS_ENGINE,
+            "supported_models": SUPPORTED_MODELS,
+            "model_info": {
+                "cosyvoice": {
+                    "name": "CosyVoice2",
+                    "type": "local",
+                    "description": "CosyVoice2-0.5B local TTS model"
+                },
+                "fishaudio": {
+                    "name": "FishAudio",
+                    "type": "cloud",
+                    "description": "FishAudio cloud-based TTS API"
+                }
+            }
+        }
+    )
+
+
+# ============== TEST CODE ==============
+def test_save_reference(file_path: Path, user_id: str, reference_text: str):
+    """
+    Test function to save user reference audio and text.
     
     Args:
         file_path: Path to the voice recording file
         user_id: User identifier
+        reference_text: Transcript of the reference audio
     """
     import requests
     
@@ -449,48 +580,62 @@ def test_embedding_generation(file_path: Path, user_id: str):
         print(f"Error: File not found at {file_path}")
         return None
     
-    url = f"http://localhost:8000/audio/embedding?user_id={user_id}"
+    url = "http://localhost:8000/audio/reference"
     
     with open(file_path, "rb") as audio_file:
-        files = {"audio_file": (file_path.name, audio_file, "audio/mp4")}
-        response = requests.post(url, files=files)
+        files = {"audio_file": (file_path.name, audio_file, "audio/wav")}
+        data = {
+            "user_id": user_id,
+            "reference_text": reference_text
+        }
+        response = requests.post(url, files=files, data=data)
     
-    print(f"Embedding Response Status: {response.status_code}")
-    print(f"Embedding Response: {response.json()}")
+    print(f"Reference Save Response Status: {response.status_code}")
+    print(f"Reference Save Response: {response.json()}")
     return response
 
 
-def test_get_embedding(user_id: str):
+def test_get_reference(user_id: str):
     """
-    Test function to retrieve user embedding.
+    Test function to retrieve user reference.
     """
     import requests
     
-    url = f"http://localhost:8000/audio/embedding/{user_id}"
+    url = f"http://localhost:8000/audio/reference/{user_id}"
     response = requests.get(url)
     
-    print(f"Get Embedding Response Status: {response.status_code}")
+    print(f"Get Reference Response Status: {response.status_code}")
     if response.status_code == 200:
         data = response.json()
-        print(f"User ID: {data['embedding_data']['user_id']}")
-        print(f"Embedding Dim: {data['embedding_data']['embedding_dim']}")
+        print(f"User ID: {data['reference_data']['user_id']}")
+        print(f"Reference Text: {data['reference_data']['reference_text']}")
+        print(f"Audio File: {data['reference_data']['audio_filename']}")
     else:
         print(f"Response: {response.json()}")
     return response
 
 
-def test_synthesize_with_user(text: str, output_file_path: Path, user_id: str = None):
+def test_synthesize_with_user(text: str, output_file_path: Path, user_id: str, model: str = None):
     """
-    Test text-to-speech synthesis with optional user embedding.
+    Test text-to-speech synthesis with user reference.
+    
+    Args:
+        text: Text to synthesize
+        output_file_path: Path to save the output audio
+        user_id: User ID
+        model: Optional TTS model name ('cosyvoice' or 'fishaudio')
     """
     import requests
     
     url = "http://localhost:8000/audio/synthesize"
-    data = {"text": text}
-    if user_id:
-        data["user_id"] = user_id
+    data = {
+        "text": text,
+        "user_id": user_id
+    }
+    if model:
+        data["model"] = model
     
-    print(f"Sending text for synthesis (user: {user_id or 'none'}): '{text[:50]}...'")
+    print(f"Sending text for synthesis (user: {user_id}, model: {model or 'default'}): '{text[:50]}...'")
     
     response = requests.post(url, data=data)
     
@@ -498,7 +643,9 @@ def test_synthesize_with_user(text: str, output_file_path: Path, user_id: str = 
     
     if response.status_code == 200:
         print(f"User ID used: {response.headers.get('X-User-Id', 'none')}")
+        print(f"Model used: {response.headers.get('X-Model-Used', 'N/A')}")
         print(f"Input text: {response.headers.get('X-Input-Text', 'N/A')}")
+        print(f"Output size: {response.headers.get('X-Output-Size', 'N/A')} bytes")
         with open(output_file_path, "wb") as f:
             f.write(response.content)
         print(f"Synthesized audio saved to: {output_file_path}")
@@ -519,7 +666,7 @@ def test_list_files():
     data = response.json()
     print(f"Uploaded files: {len(data.get('uploaded_files', []))}")
     print(f"Synthesized files: {len(data.get('synthesized_files', []))}")
-    print(f"Embedding files: {len(data.get('embedding_files', []))}")
+    print(f"Reference files: {len(data.get('reference_files', []))}")
     return response
 
 
@@ -533,22 +680,32 @@ def run_tests():
     print("Running API Tests - Unity Workflow Simulation")
     print("=" * 70)
     
-    sample_file = Path("sample.m4a")
+    # Test configuration - update these paths as needed
+    sample_file = Path("zero_shot_0.wav")  # Reference audio file
     test_user_id = "unity_test_user"
     synthesized_output = Path("synthesized_output.wav")
+    
+    # Reference text should match what is spoken in the reference audio
+    reference_text = "This is a sample reference audio for voice cloning."
+    
+    # Text to synthesize
     test_text = "Hello, this is a test of the text-to-speech synthesis system."
     
-    # Unity Function 1: Record voice -> Generate embedding
+    # Unity Function 1: Record voice -> Save reference audio and text
     print("\n" + "-" * 70)
-    print("[UNITY FUNCTION 1] Record Voice -> Generate User Embedding")
+    print("[UNITY FUNCTION 1] Record Voice -> Save Reference Audio + Text")
     print("-" * 70)
-    test_embedding_generation(file_path=sample_file, user_id=test_user_id)
+    test_save_reference(
+        file_path=sample_file,
+        user_id=test_user_id,
+        reference_text=reference_text
+    )
     
     time.sleep(0.5)
     
-    # Verify embedding was created
-    print("\n[VERIFY] Retrieving generated embedding...")
-    test_get_embedding(user_id=test_user_id)
+    # Verify reference was saved
+    print("\n[VERIFY] Retrieving saved reference...")
+    test_get_reference(user_id=test_user_id)
     
     time.sleep(0.5)
     
