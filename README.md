@@ -49,10 +49,11 @@ Additionally install CUDA runtime for GPU inference
 conda install cuda -c nvidia/label/cuda-12.1.0 -y
 ```
 
-For fish-audio-sdk
+For other requirements, such as fish-audio-sdk and boto3
 
 ```
-pip install fish-audio-sdk
+cd ..
+pip install -r requirements.txt
 
 ```
 * Test run needs an API key

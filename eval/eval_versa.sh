@@ -14,7 +14,7 @@ set -e  # Exit on error
 # Default settings
 GT_DIR="${GT_DIR:-titw-test}"
 PRED_DIR="${PRED_DIR:-titw_generated}"
-OUTPUT_DIR="eval_results"
+OUTPUT_SUFFIX="results"
 CONFIG="configs/utmos.yaml"
 VERSA_DIR="versa"
 TEXT_FILE=""  # Optional text file for WER
@@ -25,7 +25,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         comprehensive)
             CONFIG="configs/comprehensive.yaml"
-            OUTPUT_DIR="eval_results_comprehensive"
+            OUTPUT_SUFFIX="results_comp"
             # Auto-detect text file for WER
             if [ -f "titw-test/metadata/text" ]; then
                 TEXT_FILE="titw-test/metadata/text"
@@ -101,6 +101,12 @@ fi
 if [ ! -d "$VERSA_DIR" ]; then
     echo "Error: VERSA directory not found: $VERSA_DIR"
     exit 1
+fi
+
+# if output dir not set, create based on prediction dir and suffix
+if [ -z "$OUTPUT_DIR" ]; then
+    PRED_BASENAME=$(basename "$PRED_DIR")
+    OUTPUT_DIR="${PRED_BASENAME}_${OUTPUT_SUFFIX}"
 fi
 
 # Create output directory
