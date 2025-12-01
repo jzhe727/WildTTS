@@ -123,12 +123,39 @@ def generate_tts_audio(args):
     )
     output_dir = Path(args.output_dir) if args.output_dir else (SCRIPT_DIR / output_dir_name)
     output_dir = output_dir.resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # If running normally and output dir exists, exit instead of regenerating
+    if output_dir.exists() and not getattr(args, 'only_failed', False):
+        print(f"Output directory already exists: {output_dir}")
+        print("Exiting without generating new audio files.")
+        return
     
     # Load metadata
     print("Loading metadata...")
     metadata = load_metadata(metadata_dir)
     print(f"Loaded {len(metadata)} test utterances")
+    
+    # If only_failed is set, restrict to failed utterances from existing dir
+    if getattr(args, 'only_failed', False):
+        if not output_dir.exists():
+            print(f"Output directory does not exist for only_failed mode: {output_dir}")
+            print("Exiting without generating.")
+            return
+        failed_list_path = output_dir / 'failed_utterances.txt'
+        if not failed_list_path.exists():
+            print(f"No failed_utterances.txt found in {output_dir}")
+            print("Exiting without generating.")
+            return
+        with open(failed_list_path, 'r') as f:
+            failed_utts = [line.strip() for line in f if line.strip()]
+        if not failed_utts:
+            print("failed_utterances.txt is empty. Nothing to regenerate.")
+            return
+        failed_set = set(failed_utts)
+        metadata = {utt_id: info for utt_id, info in metadata.items() if utt_id in failed_set}
+        print(f"Regenerating {len(metadata)} previously failed utterances")
+    else:
+        # Normal mode: create directory if it does not exist
+        output_dir.mkdir(parents=True, exist_ok=True)
     
     print("Note: Using each utterance as its own prompt for TITW reconstruction")
     
@@ -232,6 +259,11 @@ def main():
         '--no_transcript',
         action='store_true',
         help='Disable using transcript as style_text for reference audio (transcript is used by default)'
+    )
+    parser.add_argument(
+        '--only_failed',
+        action='store_true',
+        help='If output dir exists and failed_utterances.txt is present, only regenerate failed utterances'
     )
     
     args = parser.parse_args()
