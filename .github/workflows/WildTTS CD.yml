@@ -77,9 +77,10 @@ jobs:
             --region ${{ env.REGION }} \
             --allow-unauthenticated \
             --port 8080 \
-            --memory 4Gi \
+            --memory 8Gi \
             --cpu 2 \
             --timeout 300 \
             --execution-environment gen2 \
             --add-volume name=model-volume,type=cloud-storage,bucket=${{ env.MODEL_BUCKET_NAME }} \
             --add-volume-mount volume=model-volume,mount-path=/app/backend/CosyVoice/pretrained_models
+            --set-env-vars "FISH_API_KEY=${{ secrets.FISH_API_KEY }},PYTHONPATH=/app/backend:/app/backend/CosyVoice"
