@@ -17,8 +17,7 @@ env:
   REPOSITORY: my-app-repo
   SERVICE: wildtts-backend
   REGION: northamerica-northeast2
-  # ▼▼▼ [필수 확인] 본인의 버킷 이름으로 수정되어 있는지 확인하세요! ▼▼▼
-  MODEL_BUCKET_NAME: "wildtts-models-yyc-XXXXX" 
+  MODEL_BUCKET_NAME: "wildtts-models-1764630482" 
 
 jobs:
   deploy:
