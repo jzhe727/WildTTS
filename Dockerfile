@@ -3,13 +3,17 @@ FROM python:3.10-slim
 
 
 RUN apt-get update && apt-get install -y \
-    ffmpeg<7 \
     git \
     git-lfs \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+    build-essential
 
-
+RUN apt-get install -y wget xz-utils && \
+    wget https://www.johnvansickle.com/ffmpeg/old-releases/ffmpeg-6.0.1-amd64-static.tar.xz && \
+    tar xvf ffmpeg-6.0.1-amd64-static.tar.xz && \
+    mv ffmpeg-6.0.1-amd64-static/ffmpeg /usr/local/bin/ && \
+    mv ffmpeg-6.0.1-amd64-static/ffprobe /usr/local/bin/ && \
+    rm -rf ffmpeg-6.0.1-amd64-static* && \
+    rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 COPY backend/CosyVoice/requirements.txt ./backend/CosyVoice/requirements.txt
