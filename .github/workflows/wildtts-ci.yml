@@ -1,4 +1,4 @@
-name: WildTTS / CosyVoice2 CI
+name: WildTTS CI
 
 on:
   push:
@@ -11,6 +11,15 @@ on:
     paths:
       - "backend/**"
       - ".github/workflows/wildtts-ci.yml"
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GAR_LOCATION: northamerica-northeast2
+  REPOSITORY: my-app-repo
+  SERVICE: wildtts-backend
+  REGION: northamerica-northeast2
+  # 본인 버킷 이름으로 수정 필수!
+  MODEL_BUCKET_NAME: " wildtts-models-1764630482"
 
 jobs:
   test-wildtts:
@@ -103,3 +112,4 @@ jobs:
           python cosyvoice_test.py
           python fishaudio_test.py
           python test_interface.py
+
