@@ -144,7 +144,6 @@ jobs:
           git submodule init
           
           git submodule update --init --recursive backend/CosyVoice
-          git submodule update --init --recursive backend/Matcha-TTS
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
