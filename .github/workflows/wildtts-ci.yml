@@ -131,8 +131,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: recursive
-          token: ${{ secrets.GH_PAT }}
+          # ▼▼▼ [수정 1] recursive를 false로 꺼서 에러를 막습니다 ▼▼▼
+          submodules: false 
+          fetch-depth: 0
+          # GitHub 토큰이 있다면 넣고, 없으면 이 줄을 지워도 됩니다.
+          # (이제 문제되는 비공개 레포를 안 건드릴 거니까요!)
+          token: ${{ secrets.GH_PAT }} 
+
+      # ▼▼▼ [수정 2] Backend에 꼭 필요한 서브모듈만 수동으로 가져옵니다 ▼▼▼
+      - name: Initialize specific submodules
+        run: |
+          git submodule init
+          
+          git submodule update --init --recursive backend/CosyVoice
+          git submodule update --init --recursive backend/Matcha-TTS
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
