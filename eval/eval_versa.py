@@ -118,6 +118,7 @@ def load_versa_results(result_file: Path, logger) -> Dict:
         return {}
     
     results = {}
+    incomplete_entries = []
     with open(result_file, 'r') as f:
         for line_num, line in enumerate(f, 1):
             line = line.strip()
@@ -128,6 +129,9 @@ def load_versa_results(result_file: Path, logger) -> Dict:
                 # Each line should have a 'key' field as the utterance ID
                 if 'key' in entry:
                     utt_id = entry.pop('key')
+                    # Check if entry has any metrics (more than just the key)
+                    if not entry:
+                        incomplete_entries.append(utt_id)
                     results[utt_id] = entry
                 else:
                     logger.warning(f"Line {line_num}: No 'key' field found, skipping")
@@ -136,6 +140,13 @@ def load_versa_results(result_file: Path, logger) -> Dict:
                 continue
     
     logger.info(f"Loaded {len(results)} utterance results from {result_file}")
+    
+    # Warn about incomplete entries
+    if incomplete_entries:
+        logger.warning(f"Found {len(incomplete_entries)} utterances with missing metrics:")
+        for utt_id in incomplete_entries:
+            logger.warning(f"  - {utt_id}")
+    
     return results
 
 

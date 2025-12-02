@@ -2,13 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-Generate TTS audio files for TITW test set using CosyVoice2 zero-shot inference.
+Generate TTS audio files for TITW test set using FishAudio zero-shot inference.
 
-This script uses the pretrained CosyVoice2-0.5B model to generate audio based on
-each utterance as its own prompt (TITW reconstruction task). Each test utterance
-uses its own wav file as the prompt audio and its own text as both the prompt
-transcript and generation target. It processes 9113 test utterances from the 
-TITW-test dataset.
+This script uses FishAudio API to generate audio based on each utterance as its
+own prompt (TITW reconstruction task). Each test utterance uses its own wav file
+as the prompt audio and its own text as both the prompt transcript and generation
+target. It processes 9113 test utterances from the TITW-test dataset.
 
 Format compatibility with Versa toolkit:
 - Generates WAV files with proper naming convention
@@ -90,6 +89,22 @@ def load_metadata(metadata_dir):
     return metadata
 
 
+def get_output_dir_name(enhance_audio, use_transcript):
+    """Generate output directory name based on settings."""
+    # Format: titw_fishaudio_<mode>_<transcript>_generated
+    parts = ["titw_fishaudio"]
+    if enhance_audio:
+        parts.append("enhanced")
+    else:
+        parts.append("instant")
+    if use_transcript:
+        parts.append("with_transcript")
+    else:
+        parts.append("no_transcript")
+    parts.append("generated")
+    return "_".join(parts)
+
+
 def generate_tts_audio(args):
     """
     Main function to generate TTS audio for all test utterances.
@@ -100,7 +115,14 @@ def generate_tts_audio(args):
     # Set up paths
     metadata_dir = Path(args.metadata_dir)
     test_wav_dir = Path(args.test_wav_dir)
-    output_dir = Path(args.output_dir)
+    
+    # Determine output directory based on settings
+    output_dir_name = get_output_dir_name(
+        args.enhance_audio_quality,
+        args.use_transcript
+    )
+    output_dir = Path(args.output_dir) if args.output_dir else (SCRIPT_DIR / output_dir_name)
+    output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Load metadata
@@ -111,15 +133,16 @@ def generate_tts_audio(args):
     print("Note: Using each utterance as its own prompt for TITW reconstruction")
     
     # Initialize TTS engine using the unified interface
-    print(f"Loading CosyVoice2 model from {args.model_dir}...")
+    print("Initializing FishAudio TTS...")
     tts = create_tts(
-        'cosyvoice',
-        model_path=str(args.model_dir),
-        load_jit=args.load_jit,
-        load_trt=args.load_trt,
-        fp16=args.fp16
+        'fishaudio',
+        enhance_audio_quality=args.enhance_audio_quality,
+        cache_voices=True,
+        auto_cleanup_voices=True
     )
-    print("Model loaded successfully")
+    print("FishAudio TTS initialized successfully")
+    print(f"  Enhance audio quality: {args.enhance_audio_quality}")
+    print(f"  Use transcript: {args.use_transcript}")
     
     # Generate audio for each utterance
     print("Generating TTS audio...")
@@ -128,9 +151,10 @@ def generate_tts_audio(args):
     for utt_id, utt_info in tqdm(metadata.items(), desc="Processing utterances"):
         try:
             # Use the utterance itself as the prompt (TITW reconstruction)
-            # Both the prompt wav and text come from the same utterance
             prompt_wav_path = test_wav_dir / utt_info['wav_path']
-            prompt_text = utt_info['text']
+            
+            # Transcript for reference audio (optional)
+            style_text = utt_info['text'] if args.use_transcript else None
             
             # Target text to synthesize (same as prompt text for TITW)
             tts_text = utt_info['text']
@@ -149,7 +173,7 @@ def generate_tts_audio(args):
                 text=tts_text,
                 prompt_wav_path=str(prompt_wav_path),
                 output_wav_path=str(output_path),
-                style_text=prompt_text,
+                style_text=style_text,
                 stream=False
             )
             
@@ -175,7 +199,7 @@ def generate_tts_audio(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Generate TTS audio for TITW test set using CosyVoice2'
+        description='Generate TTS audio for TITW test set using FishAudio'
     )
     
     # Paths
@@ -194,52 +218,46 @@ def main():
     parser.add_argument(
         '--output_dir',
         type=str,
-        default='titw_generated',
-        help='Output directory for generated audio files'
-    )
-    parser.add_argument(
-        '--model_dir',
-        type=str,
-        default='../backend/CosyVoice/pretrained_models/CosyVoice2-0.5B',
-        help='Path to CosyVoice2 model directory'
+        default=None,
+        help='Output directory for generated audio files (auto-generated if not specified)'
     )
     
-    # Model options
+    # FishAudio options
     parser.add_argument(
-        '--load_jit',
+        '--enhance_audio_quality',
         action='store_true',
-        help='Load JIT optimized model'
+        help='Enable audio quality enhancement (creates persistent voice models)'
     )
     parser.add_argument(
-        '--load_trt',
+        '--no_transcript',
         action='store_true',
-        help='Load TensorRT optimized model'
-    )
-    parser.add_argument(
-        '--fp16',
-        action='store_true',
-        help='Use FP16 precision'
+        help='Disable using transcript as style_text for reference audio (transcript is used by default)'
     )
     
     args = parser.parse_args()
+    
+    # Transcript is used by default, --no_transcript disables it
+    args.use_transcript = not args.no_transcript
     
     # Convert relative paths to absolute
     script_dir = Path(__file__).resolve().parent
     args.metadata_dir = (script_dir / args.metadata_dir).resolve()
     args.test_wav_dir = (script_dir / args.test_wav_dir).resolve()
-    args.output_dir = (script_dir / args.output_dir).resolve()
-    args.model_dir = (script_dir / args.model_dir).resolve()
+    
+    # Determine output directory name
+    output_dir_name = get_output_dir_name(
+        args.enhance_audio_quality,
+        args.use_transcript
+    )
     
     print("="*80)
-    print("TTS Generation for TITW Test Set")
+    print("TTS Generation for TITW Test Set (FishAudio)")
     print("="*80)
     print(f"Metadata directory: {args.metadata_dir}")
     print(f"Test wav directory: {args.test_wav_dir}")
-    print(f"Output directory: {args.output_dir}")
-    print(f"Model directory: {args.model_dir}")
-    print(f"Load JIT: {args.load_jit}")
-    print(f"Load TRT: {args.load_trt}")
-    print(f"FP16: {args.fp16}")
+    print(f"Output directory: {args.output_dir or (script_dir / output_dir_name)}")
+    print(f"Enhance audio quality: {args.enhance_audio_quality}")
+    print(f"Use transcript: {args.use_transcript}")
     print("="*80)
     
     generate_tts_audio(args)
