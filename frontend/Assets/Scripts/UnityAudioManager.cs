@@ -635,51 +635,264 @@ public class UnityAudioManager : MonoBehaviour
 
     private IEnumerator PlaySynthesizedAudio(string filePath)
     {
-        // Try loading as different audio types
+        // Check if file exists and has content
+        if (!File.Exists(filePath))
+        {
+            OnError?.Invoke($"Audio file not found: {filePath}");
+            yield break;
+        }
+
+        FileInfo fileInfo = new FileInfo(filePath);
+        Debug.Log($"Audio file: {filePath}, Size: {fileInfo.Length} bytes");
+
+        if (fileInfo.Length == 0)
+        {
+            OnError?.Invoke("Audio file is empty!");
+            yield break;
+        }
+
+        // Try to load WAV manually first (more reliable for custom WAV formats)
+        AudioClip clip = LoadWavFromFile(filePath);
+        
+        if (clip != null)
+        {
+            yield return PlayLoadedClip(clip);
+            yield break;
+        }
+
+        // Fallback: Try loading with UnityWebRequest for different audio types
+        Debug.Log("Manual WAV loading failed, trying UnityWebRequest...");
         AudioType[] audioTypes = { AudioType.WAV, AudioType.MPEG, AudioType.OGGVORBIS, AudioType.UNKNOWN };
         
         foreach (AudioType audioType in audioTypes)
         {
-            using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip("file://" + filePath, audioType))
+            Debug.Log($"Trying to load as {audioType}...");
+            
+            UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip("file://" + filePath, audioType);
+            yield return www.SendWebRequest();
+
+            bool success = false;
+            AudioClip loadedClip = null;
+
+            if (www.result == UnityWebRequest.Result.Success)
             {
-                yield return www.SendWebRequest();
-
-                if (www.result == UnityWebRequest.Result.Success)
+                try
                 {
-                    AudioClip clip = DownloadHandlerAudioClip.GetContent(www);
-                    if (clip != null)
+                    loadedClip = DownloadHandlerAudioClip.GetContent(www);
+                    if (loadedClip != null && loadedClip.length > 0)
                     {
-                        playbackAudioSource.clip = clip;
-                        playbackAudioSource.Play();
-                        OnStatusUpdate?.Invoke("Playing synthesized voice!");
-                        Debug.Log("Playing synthesized audio");
-
-                        // Start talking animation
-                        if (characterAnimator != null)
-                        {
-                            characterAnimator.SetTrigger("Talking");
-                        }
-
-                        // Wait for audio clip duration (more stable)
-                        float clipLength = clip.length;
-                        Debug.Log($"Audio clip length: {clipLength} seconds");
-                        yield return new WaitForSeconds(clipLength);
-
-                        Debug.Log("Audio playback completed");
-
-                        // Stop talking animation
-                        if (characterAnimator != null)
-                        {
-                            characterAnimator.SetTrigger("Stop_Talk");
-                        }
-
-                        yield break;
+                        Debug.Log($"Successfully loaded as {audioType}");
+                        success = true;
                     }
                 }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"Failed to load as {audioType}: {e.Message}");
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"Failed to load as {audioType}: {www.error}");
+            }
+
+            www.Dispose();
+
+            if (success && loadedClip != null)
+            {
+                yield return PlayLoadedClip(loadedClip);
+                yield break;
             }
         }
 
-        OnError?.Invoke("Failed to play synthesized audio");
+        OnError?.Invoke("Failed to play synthesized audio - unsupported format");
+    }
+
+    /// <summary>
+    /// Play a loaded AudioClip with animation support.
+    /// </summary>
+    private IEnumerator PlayLoadedClip(AudioClip clip)
+    {
+        playbackAudioSource.clip = clip;
+        playbackAudioSource.Play();
+        OnStatusUpdate?.Invoke("Playing synthesized voice!");
+        Debug.Log($"Playing synthesized audio: {clip.length}s, {clip.frequency}Hz, {clip.channels}ch");
+
+        // Start talking animation
+        if (characterAnimator != null)
+        {
+            characterAnimator.SetTrigger("Talking");
+        }
+
+        // Wait for audio clip duration
+        yield return new WaitForSeconds(clip.length);
+
+        Debug.Log("Audio playback completed");
+
+        // Stop talking animation
+        if (characterAnimator != null)
+        {
+            characterAnimator.SetTrigger("Stop_Talk");
+        }
+    }
+
+    /// <summary>
+    /// Load a WAV file manually (supports more WAV formats than Unity's default loader).
+    /// </summary>
+    private AudioClip LoadWavFromFile(string filePath)
+    {
+        try
+        {
+            byte[] fileBytes = File.ReadAllBytes(filePath);
+            return LoadWavFromBytes(fileBytes, Path.GetFileNameWithoutExtension(filePath));
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"Failed to load WAV manually: {e.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Load a WAV file from byte array (supports various sample rates and bit depths).
+    /// </summary>
+    private AudioClip LoadWavFromBytes(byte[] wavData, string clipName)
+    {
+        try
+        {
+            // Check RIFF header
+            if (wavData.Length < 44)
+            {
+                Debug.LogWarning("WAV data too short");
+                return null;
+            }
+
+            string riff = System.Text.Encoding.ASCII.GetString(wavData, 0, 4);
+            string wave = System.Text.Encoding.ASCII.GetString(wavData, 8, 4);
+            
+            if (riff != "RIFF" || wave != "WAVE")
+            {
+                Debug.LogWarning($"Invalid WAV header: {riff} {wave}");
+                return null;
+            }
+
+            // Find fmt chunk
+            int fmtIndex = FindChunk(wavData, "fmt ");
+            if (fmtIndex < 0)
+            {
+                Debug.LogWarning("fmt chunk not found");
+                return null;
+            }
+
+            int fmtSize = BitConverter.ToInt32(wavData, fmtIndex + 4);
+            int audioFormat = BitConverter.ToInt16(wavData, fmtIndex + 8);
+            int channels = BitConverter.ToInt16(wavData, fmtIndex + 10);
+            int sampleRate = BitConverter.ToInt32(wavData, fmtIndex + 12);
+            int bitsPerSample = BitConverter.ToInt16(wavData, fmtIndex + 22);
+
+            Debug.Log($"WAV format: {audioFormat}, Channels: {channels}, SampleRate: {sampleRate}, BitsPerSample: {bitsPerSample}");
+
+            // Find data chunk
+            int dataIndex = FindChunk(wavData, "data");
+            if (dataIndex < 0)
+            {
+                Debug.LogWarning("data chunk not found");
+                return null;
+            }
+
+            int dataSize = BitConverter.ToInt32(wavData, dataIndex + 4);
+            int dataStart = dataIndex + 8;
+
+            // Convert to float samples
+            float[] samples;
+            
+            if (bitsPerSample == 16)
+            {
+                int sampleCount = dataSize / 2;
+                samples = new float[sampleCount];
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    short sample = BitConverter.ToInt16(wavData, dataStart + i * 2);
+                    samples[i] = sample / 32768f;
+                }
+            }
+            else if (bitsPerSample == 24)
+            {
+                int sampleCount = dataSize / 3;
+                samples = new float[sampleCount];
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    int sample = (wavData[dataStart + i * 3] << 8) | 
+                                 (wavData[dataStart + i * 3 + 1] << 16) | 
+                                 (wavData[dataStart + i * 3 + 2] << 24);
+                    samples[i] = sample / 2147483648f;
+                }
+            }
+            else if (bitsPerSample == 32)
+            {
+                int sampleCount = dataSize / 4;
+                samples = new float[sampleCount];
+                
+                // Check if it's float or int32
+                if (audioFormat == 3) // IEEE Float
+                {
+                    for (int i = 0; i < sampleCount; i++)
+                    {
+                        samples[i] = BitConverter.ToSingle(wavData, dataStart + i * 4);
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < sampleCount; i++)
+                    {
+                        int sample = BitConverter.ToInt32(wavData, dataStart + i * 4);
+                        samples[i] = sample / 2147483648f;
+                    }
+                }
+            }
+            else if (bitsPerSample == 8)
+            {
+                samples = new float[dataSize];
+                for (int i = 0; i < dataSize; i++)
+                {
+                    samples[i] = (wavData[dataStart + i] - 128) / 128f;
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"Unsupported bits per sample: {bitsPerSample}");
+                return null;
+            }
+
+            // Create AudioClip
+            int sampleLength = samples.Length / channels;
+            AudioClip clip = AudioClip.Create(clipName, sampleLength, channels, sampleRate, false);
+            clip.SetData(samples, 0);
+            
+            Debug.Log($"Successfully loaded WAV: {sampleLength} samples, {clip.length}s");
+            return clip;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"Error parsing WAV: {e.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Find a chunk in WAV data by its ID.
+    /// </summary>
+    private int FindChunk(byte[] data, string chunkId)
+    {
+        byte[] id = System.Text.Encoding.ASCII.GetBytes(chunkId);
+        for (int i = 12; i < data.Length - 8; i++)
+        {
+            if (data[i] == id[0] && data[i + 1] == id[1] && 
+                data[i + 2] == id[2] && data[i + 3] == id[3])
+            {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /// <summary>
