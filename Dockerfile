@@ -12,12 +12,13 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-
+COPY backend/CosyVoice/requirements.txt ./backend/CosyVoice/requirements.txt
+RUN pip install --no-cache-dir -r backend/CosyVoice/requirements.txt
 COPY backend/requirements.txt ./backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
 
-COPY . .
+COPY backend ./backend
 ENV PORT=8080
 
 ENV PYTHONUNBUFFERED=1
