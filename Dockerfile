@@ -3,7 +3,7 @@ FROM python:3.10-slim
 
 
 RUN apt-get update && apt-get install -y \
-    ffmpeg \
+    ffmpeg<7 \
     git \
     git-lfs \
     build-essential \
