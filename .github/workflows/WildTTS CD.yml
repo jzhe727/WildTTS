@@ -78,7 +78,7 @@ jobs:
             --allow-unauthenticated \
             --port 8080 \
             --memory 8Gi \
-            --cpu 2 \
+            --cpu 8 \
             --timeout 300 \
             --execution-environment gen2 \
             --add-volume name=model-volume,type=cloud-storage,bucket=${{ env.MODEL_BUCKET_NAME }} \
