@@ -132,7 +132,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-          token: ${{ secrets.TITW_Test_Token }}
+          token: ${{ secrets.GH_PAT }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
