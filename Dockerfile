@@ -23,6 +23,7 @@ ENV PORT=8080
 
 ENV PYTHONUNBUFFERED=1
 
+RUN mkdir -p /app/backend/CosyVoice/pretrained_models
 
 WORKDIR /app/backend
 
