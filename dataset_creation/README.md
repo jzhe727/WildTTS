@@ -1,0 +1,22 @@
+The directory structure is complicated, but the scripts in this folder hopefully do not need to be run again.
+```
+WildTTS
+    ...
+    dataset_creation
+        create_parquet.py
+training
+    data
+        titw
+            bonafide_metadata_cfg_v3
+            bonafide_metadata_cfg_v6
+            easy
+                dev
+                    *.wav
+                test
+                    *.wav
+            hard
+                dev
+                    *.wav
+                test
+                    *.wav
+```
