@@ -1,0 +1,89 @@
+# Campplus Finetuning Configuration
+# ==================================
+
+# Data settings
+data:
+  huggingface_dataset: "jzhe727/wildtts-titw"
+  top_k_samples_per_speaker: 10
+  train_val_split: 0.9  # 90% train, 10% validation
+  sample_rate: 16000
+
+# Campplus model settings
+campplus:
+  # Original ONNX checkpoint
+  pretrained_path: "../campplus.onnx"
+  # Embedding dimension
+  embedding_dim: 192
+  # Feature extraction settings
+  num_mel_bins: 80
+  frame_shift: 10  # ms
+  frame_length: 25  # ms
+
+# Training settings
+training:
+  epochs: 50
+  batch_size: 32
+  learning_rate: 1.0e-4
+  weight_decay: 1.0e-5
+  lr_scheduler: "cosine"
+  warmup_epochs: 5
+  gradient_clip: 1.0
+  
+  # Loss function
+  loss: "cosine_embedding_loss"  # or "mse_loss"
+  margin: 0.0  # for cosine embedding loss
+  
+  # Checkpointing
+  save_every_epochs: 5
+  checkpoint_dir: "./checkpoints"
+  
+  # Early stopping
+  early_stopping_patience: 10
+  
+  # Data augmentation
+  augmentation:
+    enabled: true
+    noise_snr_range: [10, 30]  # dB
+    speed_perturb: [0.9, 1.1]
+
+# MLflow settings
+mlflow:
+  tracking_uri: "http://localhost:5000"
+  experiment_name: "campplus_finetuning"
+  run_name: null  # auto-generated if null
+  
+  # Artifacts to log
+  log_artifacts:
+    - dnsmos_scores
+    - best_samples
+    - target_embeddings
+    - model_checkpoints
+    - training_curves
+
+# HuggingFace settings
+huggingface:
+  model_repo: "jungee/campplus-finetuned"
+  push_to_hub: true
+  private: false
+
+# Evaluation settings
+evaluation:
+  # CosyVoice2 config for evaluation
+  cosyvoice_config: "../eval/configs/cosyvoice2_finetuned.yaml"
+  # Test data
+  test_metadata_dir: "../../titw-test/metadata"
+  test_wav_dir: "../../titw-test"
+  # Output
+  output_dir: "./eval_output"
+  
+  # Metrics to compute
+  metrics:
+    - utmos
+    - dnsmos
+    - speaker_similarity
+    - wer
+
+# Logging
+logging:
+  level: "INFO"
+  log_dir: "./logs"
