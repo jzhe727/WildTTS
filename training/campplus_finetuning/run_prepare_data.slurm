@@ -12,8 +12,14 @@
 
 # Campplus Finetuning SLURM Job Script
 # =====================================
-cd ~/ensf619/WildTTS/training/campplus_finetuning
+
 # Activate virtual environment
+cd ~/ensf619/
+# make subprocess run mlflow_server_script.slurm on the same device
+sh -c mlflow_server_script.sh &
+sleep 20  # Give some time for the server to start
+
+cd ~/ensf619/WildTTS/training/campplus_finetuning
 eval "$(conda shell.bash hook)"
 conda activate wildtts-torchmetrics
 
