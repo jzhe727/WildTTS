@@ -1,0 +1,21 @@
+name: WildTTS / Data Preparation for Training
+
+on:
+
+  workflow_dispatch:
+
+  workflow_run:
+    workflows: ["WildTTS CI"]
+    types:
+      - completed
+    branches:
+      - main
+      - finetuning
+
+jobs:
+  data-prep:
+    runs-on: [self-hosted, arc]
+    steps:
+        - name: allocate_batch_job
+          run: sbatch ~/ensf619/WildTTS/training/campplus_finetuning/run_prepare_data.slurm
+
