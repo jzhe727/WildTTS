@@ -4,13 +4,10 @@ on:
 
   workflow_dispatch:
 
-  workflow_run:
-    workflows: ["WildTTS CI"]
-    types:
-      - completed
-    branches:
-      - main
-      - finetuning
+  push:
+    branches: [ main, finetuning ]
+
+    
 
 jobs:
   data-prep:
