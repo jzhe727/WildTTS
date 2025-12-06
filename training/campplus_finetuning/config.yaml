@@ -3,21 +3,10 @@
 
 # Data settings
 data:
-  huggingface_dataset: "jungee/titw"
-  local_data_dir: "./data/titw"
+  huggingface_dataset: "jzhe727/wildtts-titw"
   top_k_samples_per_speaker: 10
   train_val_split: 0.9  # 90% train, 10% validation
   sample_rate: 16000
-
-# DNSMOS settings
-dnsmos:
-  # Path to cloned DNSMOS repository
-  repo_path: "./DNSMOS"
-  # Model to use (p835 or p808)
-  model_type: "p835"
-  # Personalized MOS (pMOS) model path within repo
-  # The DNSMOS repo contains sig_bak_ovr.onnx for p835
-  batch_size: 16
 
 # Campplus model settings
 campplus:

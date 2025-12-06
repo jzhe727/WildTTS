@@ -32,7 +32,9 @@ campplus_finetuning/
 ## Requirements
 
 ```bash
-pip install torch torchaudio numpy pyyaml mlflow tqdm onnxruntime huggingface_hub
+pip install -r requirements.txt
+conda install cuda -c nvidia/label/cuda-12.8.0 -y
+conda install 'ffmpeg<7' -y
 ```
 
 For DNSMOS scoring, clone the Microsoft DNSMOS repository:
