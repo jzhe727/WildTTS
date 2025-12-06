@@ -59,7 +59,7 @@ def stream_dataset_batched(config: dict, subset: str = "easy", batch_size: int =
 def compute_dnsmos_scores_streaming(
     config: dict,
     subset: str = "easy",
-    batch_size: int = 16
+    batch_size: int = 64
 ) -> Dict[str, Dict]:
     """
     Compute DNSMOS scores using TorchMetrics functional API.
@@ -130,8 +130,12 @@ def compute_dnsmos_scores_streaming(
                 padded_batch[idx, :t.shape[0]] = t
             
             # Run prediction using functional API
-            # Result is a dictionary containing tensors of scores
-            res = deep_noise_suppression_mean_opinion_score(padded_batch, sampling_rate=target_fs, model="v8")
+            # Result is a tensor with shape (batch_size, 4) containing [p808_mos, mos_sig, mos_bak, mos_ovr]
+            # Note: device parameter expects a string like "cuda:0" or None, not a torch.device object
+            #if device is cpu, dns_device is cpu, otherwise cuda:device_id
+            dns_device = "cpu" if str(device) == "cpu" else f"cuda:{device.index if device.index is not None else 0}"
+            res = deep_noise_suppression_mean_opinion_score(padded_batch, personalized=True, fs=target_fs, 
+                                                            device=dns_device)
             
             # Iterate through results and map back to metadata
             # The functional output tensors should align with the batch index
@@ -140,9 +144,9 @@ def compute_dnsmos_scores_streaming(
                     "speaker_id": meta['speaker_id'],
                     "text": meta['text'],
                     "dnsmos": {
-                        "sig": res['dnsmos_sig'][idx].item(),
-                        "bak": res['dnsmos_bak'][idx].item(),
-                        "ovr": res['dnsmos_ovr'][idx].item(),
+                        "sig": res[idx, 1].item(),  # mos_sig is at index 1
+                        "bak": res[idx, 2].item(),  # mos_bak is at index 2
+                        "ovr": res[idx, 3].item(),  # mos_ovr is at index 3
                     }
                 }
                 
