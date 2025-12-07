@@ -12,3 +12,7 @@ torchcodec
 onnxruntime-gpu
 boto3
 psycopg2-binary
+onnx
+onnx2torch 
+onnx2pytorch
+

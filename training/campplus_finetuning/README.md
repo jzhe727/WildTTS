@@ -123,3 +123,6 @@ After training:
 The trained model is also:
 - Logged to MLflow as an artifact
 - Uploaded to HuggingFace Hub (if enabled)
+
+
+zero_shot_prompt.wav is from Cosyvoice.
