@@ -327,3 +327,4 @@ frontend/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Core/Property
 frontend/[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
 
 training/campplus_finetuning/logs/
+training/campplus_finetuning/data_artifacts/

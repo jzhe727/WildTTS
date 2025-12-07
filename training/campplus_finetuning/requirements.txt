@@ -10,4 +10,5 @@ huggingface_hub>=0.19.0
 datasets
 torchcodec
 onnxruntime-gpu
-
+boto3
+psycopg2-binary
