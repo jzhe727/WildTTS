@@ -5,7 +5,6 @@
 data:
   huggingface_dataset: "jzhe727/wildtts-titw"
   top_k_samples_per_speaker: 10
-  train_val_split: 0.9  # 90% train, 10% validation
   sample_rate: 16000
 
 # Campplus model settings
@@ -62,9 +61,9 @@ mlflow:
 
 # HuggingFace settings
 huggingface:
-  model_repo: "jungee/campplus-finetuned"
+  model_repo: "jzhe727/campplus-finetuned"
   push_to_hub: true
-  private: false
+  private: true
 
 # Evaluation settings
 evaluation:
