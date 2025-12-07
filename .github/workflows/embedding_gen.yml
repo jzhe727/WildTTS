@@ -1,9 +1,7 @@
 name: WildTTS / Create target embeddings
 
 on:
-
   workflow_dispatch:
-  push:
 
 
     
