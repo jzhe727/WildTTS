@@ -1,18 +1,17 @@
-name: WildTTS / Data Preparation for Training
+name: WildTTS / Create target embeddings
 
 on:
-
   workflow_dispatch:
 
 
     
 
 jobs:
-  data-prep:
+  target_embeddings:
     runs-on: [self-hosted, arc]
     steps:
         - name: allocate_batch_job
           run: | 
             cd ~/ensf619/WildTTS/training/campplus_finetuning
-            sbatch run_prepare_data.slurm
+            sbatch run_generate_embeddings.slurm
 

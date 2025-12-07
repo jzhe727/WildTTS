@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=prepare_data
-#SBATCH --output=logs/prepare_%j.out
-#SBATCH --error=logs/prepare_%j.err
+#SBATCH --job-name=gen_embed
+#SBATCH --output=logs/gen_embed_%j.out
+#SBATCH --error=logs/gen_embed_%j.err
 #SBATCH --time=24:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=2
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=64G
+#SBATCH --mem=100G
 #SBATCH --gres=gpu:1
-#SBATCH --partition=gpu-l40
+#SBATCH --partition=gpu-l40,gpu-v100
 
 # Campplus Finetuning SLURM Job Script
 # =====================================
@@ -30,9 +30,9 @@ cd ~/ensf619/WildTTS/training/campplus_finetuning
 eval "$(conda shell.bash hook)"
 conda activate wildtts-torchmetrics
 
-python run_pipeline.py 
+python generate_target_embeddings.py
 
-
+sleep 10
 echo "Finishing up..."
 
 kill_children
