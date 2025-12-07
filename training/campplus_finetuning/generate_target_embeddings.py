@@ -153,7 +153,8 @@ def generate_target_embeddings(
     campplus_session: onnxruntime.InferenceSession,
     campplus_config: dict,
     dataset_name: str,
-    target_utt_ids: Set[str]
+    target_utt_ids: Set[str],
+    subset: str = "easy",
 ) -> Dict[str, Dict]:
     """
     Generate target embeddings for all top samples per speaker.
@@ -164,6 +165,7 @@ def generate_target_embeddings(
         campplus_config: Campplus configuration
         dataset_name: HuggingFace dataset name to stream from
         target_utt_ids: Set of utterance IDs to process
+        subset: Dataset subset to use (e.g., "easy")
         
     Returns:
         Dictionary mapping speaker_id to {
@@ -183,7 +185,7 @@ def generate_target_embeddings(
     
     # Stream dataset and process matching utterances
     print(f"Streaming dataset: {dataset_name}")
-    dataset = load_dataset(dataset_name, split="train", streaming=True)
+    dataset = load_dataset(dataset_name, data_dir=subset, split="train", streaming=True)
     
     processed_count = 0
     total_target = len(target_utt_ids)
