@@ -9,12 +9,11 @@ on:
     
 
 jobs:
-  data-prep:
+  target_embeddings:
     runs-on: [self-hosted, arc]
     steps:
         - name: allocate_batch_job
           run: | 
-            echo "registered"
-            # cd ~/ensf619/WildTTS/training/campplus_finetuning
-            # sbatch run_generate_embeddings.slurm
+            cd ~/ensf619/WildTTS/training/campplus_finetuning
+            sbatch run_generate_embeddings.slurm
 

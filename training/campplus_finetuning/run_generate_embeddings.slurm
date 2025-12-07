@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=prepare_data
-#SBATCH --output=logs/prepare_%j.out
-#SBATCH --error=logs/prepare_%j.err
+#SBATCH --job-name=gen_embed
+#SBATCH --output=logs/gen_embed_%j.out
+#SBATCH --error=logs/gen_embed_%j.err
 #SBATCH --time=24:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=2
