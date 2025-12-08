@@ -52,8 +52,7 @@ echo "=========================================="
 # Run training
 python train_simple.py \
     --config averaged_config.yaml \
-    --embedding_dir ./embedding_artifacts \
-    --epochs 1 \
+    --embedding_dir ./embedding_artifacts/ \
     --num_workers 16
 
 echo "=========================================="
