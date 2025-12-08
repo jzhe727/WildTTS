@@ -125,22 +125,16 @@ class HFStreamingDataset(IterableDataset):
         
     def __iter__(self):
         worker_info = get_worker_info()
-        ds = self.ds
         
-        # Shard the dataset if running with multiple workers
-        if worker_info is not None:
-            # ds.shard handles splitting the underlying data files among workers
-            try:
-                ds = ds.shard(num_shards=worker_info.num_workers, index=worker_info.id)
-            except AttributeError:
-                # Fallback if shard is not available (though it should be for IterableDataset)
-                print(f"Warning: Dataset sharding not supported for worker {worker_info.id}")
-                pass
+        # NOTE: Do NOT manually shard the dataset here!
+        # HuggingFace streaming datasets automatically distribute shards across
+        # PyTorch DataLoader workers. Manual sharding causes conflicts and results
+        # in the "Too many dataloader workers" warning.
         
         processed_count = 0
         skipped_count = 0
         
-        for item in ds:
+        for item in self.ds:
             utt_id = item['id']
             spk_id = item['speaker_id']
             
