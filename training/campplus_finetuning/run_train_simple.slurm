@@ -3,9 +3,9 @@
 #SBATCH --output=logs/train_%j.out
 #SBATCH --error=logs/train_%j.err
 #SBATCH --time=24:00:00
-#SBATCH --nodes=1
+#SBATCH --nodes=1-1
 #SBATCH --ntasks=2
-#SBATCH --cpus-per-gpu=16
+#SBATCH --cpus-per-task=16
 #SBATCH --overcommit
 #SBATCH --mem=100G
 #SBATCH --gres=gpu:1

@@ -3,9 +3,10 @@
 #SBATCH --output=logs/gen_embed_%j.out
 #SBATCH --error=logs/gen_embed_%j.err
 #SBATCH --time=24:00:00
-#SBATCH --nodes=1
+#SBATCH --nodes=1-1
 #SBATCH --ntasks=2
-#SBATCH --cpus-per-task=8
+#SBATCH --overcommit
+#SBATCH --cpus-per-task=16
 #SBATCH --mem=100G
 #SBATCH --gres=gpu:1
 #SBATCH --partition=gpu-l40,gpu-v100
