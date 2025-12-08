@@ -457,7 +457,8 @@ def main():
             batch_size=training_config['batch_size'],
             num_workers=args.num_workers,
             collate_fn=collate_fn,
-            pin_memory=True if torch.cuda.is_available() else False
+            pin_memory=True if torch.cuda.is_available() else False,
+            drop_last=True  # avoid batch norm issues with small last batch
         )
         
         # Create checkpoint directory
