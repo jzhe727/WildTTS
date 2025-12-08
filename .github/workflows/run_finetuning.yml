@@ -10,5 +10,5 @@ jobs:
     steps:
         - name: allocate_batch_job
           run: | 
-            echo "Registered action"
-            # cd ~/ensf619/WildTTS/training/campplus_finetuning
+            cd ~/ensf619/WildTTS/training/campplus_finetuning
+            sbatch run_train_simple.slurm
