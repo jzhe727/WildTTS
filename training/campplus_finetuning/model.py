@@ -13,6 +13,11 @@ import torch
 import torch.nn as nn
 from onnx2torch import convert
 
+try:
+    from onnx2torch.node_converters.batch_norm import OnnxBatchNorm
+except ImportError:
+    OnnxBatchNorm = None
+
 
 class CampplusFinetunableModel(nn.Module):
     """
@@ -28,6 +33,9 @@ class CampplusFinetunableModel(nn.Module):
         
         # Convert ONNX to PyTorch using onnx2torch
         self.backbone = convert(onnx_path)
+        
+        # Track which BatchNorm layers are frozen
+        self._frozen_batchnorm = False
         
         # Get embedding dimension by doing a forward pass
         with torch.no_grad():
@@ -58,16 +66,33 @@ class CampplusFinetunableModel(nn.Module):
         for param in self.backbone.parameters():
             param.requires_grad = True
     
+    def _apply_batchnorm_eval(self):
+        """Helper method to set all BatchNorm layers to eval mode."""
+        for module in self.backbone.modules():
+            # Check for both PyTorch BatchNorm and onnx2torch's OnnxBatchNorm
+            if isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
+                module.eval()
+            elif OnnxBatchNorm is not None and isinstance(module, OnnxBatchNorm):
+                module.eval()
+    
     def freeze_batchnorm(self):
         """
         Freeze BatchNorm layers to allow batch_size=1 training.
         This keeps the running statistics from pretrained model.
         """
+        self._frozen_batchnorm = True
+        
+        # Freeze parameters for both PyTorch BatchNorm and onnx2torch's OnnxBatchNorm
         for module in self.backbone.modules():
-            if isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
-                module.eval()
+            is_batchnorm = isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d))
+            is_onnx_batchnorm = OnnxBatchNorm is not None and isinstance(module, OnnxBatchNorm)
+            
+            if is_batchnorm or is_onnx_batchnorm:
                 for param in module.parameters():
                     param.requires_grad = False
+        
+        # Force to eval mode immediately
+        self._apply_batchnorm_eval()
 
 
 def create_model(onnx_path: str) -> CampplusFinetunableModel:

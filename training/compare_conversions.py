@@ -3,6 +3,7 @@ Simple comparison script for CAM++ model conversion methods.
 Tests: ONNX Runtime, onnx2torch, and onnx2pytorch
 """
 
+import sys
 import torch
 import numpy as np
 import onnxruntime as ort
@@ -110,30 +111,34 @@ def test_onnx2torch(onnx_path: str, input_tensor: torch.Tensor):
         traceback.print_exc()
         return None, None
 
-def test_onnx2pytorch(onnx_path: str, input_tensor: torch.Tensor):
-    """Test with onnx2pytorch."""
-    print("\n=== Testing onnx2pytorch ===")
+def test_model_py(onnx_path: str, input_tensor: torch.Tensor):
+    """Test using custom model wrapper."""
+    print("\n=== Testing custom model ===")
     try:
-        from onnx2pytorch import ConvertModel
-        import onnx
-        
-        onnx_model = onnx.load(onnx_path)
-        model = ConvertModel(onnx_model)
-        model.eval()
-        
+        sys.path.append(str(Path(__file__).parent / "campplus_finetuning"))
+        from model import CampplusFinetunableModel
+        model = CampplusFinetunableModel(onnx_path)
+        model.train()
+        model.unfreeze_all()
+        model.freeze_batchnorm()  # Freeze BatchNorm for batch_size=1 training
+
+        print("\n--- Running Forward Pass ---")
+        print(f"Input shape: {input_tensor.shape}")
         with torch.no_grad():
             output = model(input_tensor)
-        
         output_np = output.cpu().numpy()
         print(f"✓ Conversion successful")
         print(f"Output shape: {output_np.shape}")
         print(f"Output sample: {output_np[0, :5]}")
-        
         return output_np, model
-        
     except Exception as e:
+        import traceback
         print(f"✗ Failed: {e}")
+        print("\n--- Full Traceback ---")
+        traceback.print_exc()
         return None, None
+
+
 
 def compare_outputs(onnx_out, torch_out, pytorch_out):
     """Compare outputs from all three methods."""
@@ -164,8 +169,16 @@ def test_gradient_flow(model, input_tensor: torch.Tensor):
         print("Model is None, skipping")
         return False
     
+
     input_tensor.requires_grad = True
-    output = model(input_tensor)
+    try:
+        output = model(input_tensor)
+    except Exception as e:
+        import traceback
+        print(f"✗ Failed: {e}")
+        print("\n--- Full Traceback ---")
+        traceback.print_exc()
+        return None, None
     
     # Simple backward pass
     loss = output.sum()
@@ -207,25 +220,25 @@ def main():
     # Test all three methods
     onnx_output = test_onnx_runtime(onnx_path, input_np)
     torch_output, torch_model = test_onnx2torch(onnx_path, input_torch)
-    pytorch_output, pytorch_model = test_onnx2pytorch(onnx_path, input_torch)
+    custom_model_output, custom_model = test_model_py(onnx_path, input_torch)
     
     # Compare outputs
-    compare_outputs(onnx_output, torch_output, pytorch_output)
+    compare_outputs(onnx_output, torch_output, custom_model_output)
     
     # Test gradients
     if torch_model is not None:
         print("\n--- onnx2torch gradient test ---")
         test_gradient_flow(torch_model, input_torch.clone())
     
-    if pytorch_model is not None:
+    if custom_model is not None:
         print("\n--- onnx2pytorch gradient test ---")
-        test_gradient_flow(pytorch_model, input_torch.clone())
+        test_gradient_flow(custom_model, input_torch.clone())
     
     # Recommendation
     print("\n=== Recommendation ===")
     if torch_output is not None and np.allclose(onnx_output, torch_output, atol=1e-5):
         print("✓ onnx2torch: Working correctly")
-    if pytorch_output is not None and np.allclose(onnx_output, pytorch_output, atol=1e-5):
+    if custom_model_output is not None and np.allclose(onnx_output, custom_model_output, atol=1e-5):
         print("✓ onnx2pytorch: Working correctly")
 
 
