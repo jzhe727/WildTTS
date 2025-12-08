@@ -1,0 +1,19 @@
+name: WildTTS / Finetuning
+on:
+
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+
+
+    
+
+jobs:
+  data-prep:
+    runs-on: [self-hosted, arc]
+    steps:
+        - name: allocate_batch_job
+          run: | 
+            echo "Registered action"
+            # cd ~/ensf619/WildTTS/training/campplus_finetuning
