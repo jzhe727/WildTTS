@@ -335,14 +335,20 @@ def export_onnx_model(model: nn.Module, output_path: str, opset_version: int = 1
         Uses legacy ONNX exporter (not dynamo=True) because onnx2torch-converted
         models contain data-dependent operations that are incompatible with
         torch.export.export.
+        
+        IMPORTANT: Model must be moved to CPU before export to avoid segfaults.
+        onnx2torch-converted models contain operations that call .numpy() or 
+        interact with CPU during tracing, which causes segfaults when exporting
+        from GPU.
     """
+    # Move model to CPU for ONNX export - required for onnx2torch models
+    # to avoid segfaults during tracing (some ops call .numpy() internally)
+    original_device = next(model.parameters()).device
+    model = model.cpu()
     model.eval()
     
-    # Create dummy input: (batch, time, features)
-    # Using a reasonable length like 200 frames
-    # Ensure input is on the same device as model
-    device = next(model.parameters()).device
-    dummy_input = torch.randn(1, 200, 80, device=device)
+    # Create dummy input on CPU
+    dummy_input = torch.randn(1, 200, 80)
     
     # Use legacy ONNX exporter - dynamo=True is incompatible with onnx2torch models
     # due to data-dependent operations in gather/reshape nodes
@@ -362,6 +368,10 @@ def export_onnx_model(model: nn.Module, output_path: str, opset_version: int = 1
         dynamo=False
     )
     print(f"Model exported to {output_path}")
+    
+    # Move model back to original device if needed
+    if original_device != torch.device('cpu'):
+        model = model.to(original_device)
 
 
 def main():
