@@ -33,6 +33,7 @@ import torchaudio
 import torchaudio.compliance.kaldi as kaldi
 from torch.utils.data import IterableDataset, DataLoader, get_worker_info
 
+
 from model import create_model
 
 
@@ -112,16 +113,19 @@ class HFStreamingDataset(IterableDataset):
         self.dataset_name = config['data']['huggingface_dataset']
         self.num_mel_bins = config['campplus']['num_mel_bins']
         
-    def __iter__(self):
-        worker_info = get_worker_info()
-        
-        # Load dataset with streaming enabled
-        ds = load_dataset(
+        # Load dataset in __init__ to avoid concurrent access issues
+        print(f"Loading dataset {self.dataset_name} (subset={self.subset})...")
+        self.ds = load_dataset(
             self.dataset_name,
             data_dir=self.subset,
             streaming=True,
             split="train"
         )
+        print(f"Dataset loaded, has {self.ds.num_shards} shards.")
+        
+    def __iter__(self):
+        worker_info = get_worker_info()
+        ds = self.ds
         
         # Shard the dataset if running with multiple workers
         if worker_info is not None:
@@ -133,12 +137,16 @@ class HFStreamingDataset(IterableDataset):
                 print(f"Warning: Dataset sharding not supported for worker {worker_info.id}")
                 pass
         
+        processed_count = 0
+        skipped_count = 0
+        
         for item in ds:
             utt_id = item['id']
             spk_id = item['speaker_id']
             
             # Skip if speaker not in embeddings
             if spk_id not in self.speaker_embeddings:
+                skipped_count += 1
                 continue
             
             try:
@@ -153,10 +161,7 @@ class HFStreamingDataset(IterableDataset):
                     self.num_mel_bins
                 )
                 
-                # Skip very short utterances
-                if features.shape[0] < 10:
-                    continue
-                
+                processed_count += 1
                 yield {
                     "features": features,
                     "target_embedding": self.speaker_embeddings[spk_id],
@@ -167,6 +172,9 @@ class HFStreamingDataset(IterableDataset):
             except Exception as e:
                 print(f"Error processing {utt_id}: {e}")
                 continue
+                
+        if worker_info is not None:
+            print(f"Worker {worker_info.id}: Processed {processed_count}, Skipped {skipped_count}")
 
 
 def collate_fn(batch: List[Dict]) -> Optional[Dict[str, torch.Tensor]]:
@@ -233,7 +241,8 @@ def train_one_epoch(
     config: dict,
     optimizer: optim.Optimizer,
     device: torch.device,
-    epoch: int = 0
+    epoch: int = 0,
+    prev_steps: int = 0
 ) -> Dict[str, float]:
     """
     Train the model for one epoch.
@@ -295,6 +304,12 @@ def train_one_epoch(
         total_cosine_sim += cosine_sim.item()
         num_batches += 1
         num_samples += features.shape[0]
+
+        mlflow.log_metrics({
+            'batch_cosine_similarity': cosine_sim.item(),
+            'batch_size': features.shape[0]
+        }, step=prev_steps + num_batches)
+
         
         pbar.set_postfix({
             'loss': f'{loss.item():.4f}',
@@ -313,11 +328,52 @@ def train_one_epoch(
     }
 
 
+def export_onnx_model(model: nn.Module, output_path: str, opset_version: int = 14):
+    """
+    Export the PyTorch model to ONNX format.
+    
+    Args:
+        model: The PyTorch model to export
+        output_path: Path to save the ONNX model
+        opset_version: ONNX opset version
+        
+    Note:
+        Uses legacy ONNX exporter (not dynamo=True) because onnx2torch-converted
+        models contain data-dependent operations that are incompatible with
+        torch.export.export.
+    """
+    model.eval()
+    
+    # Create dummy input: (batch, time, features)
+    # Using a reasonable length like 200 frames
+    # Ensure input is on the same device as model
+    device = next(model.parameters()).device
+    dummy_input = torch.randn(1, 200, 80, device=device)
+    
+    # Use legacy ONNX exporter - dynamo=True is incompatible with onnx2torch models
+    # due to data-dependent operations in gather/reshape nodes
+    torch.onnx.export(
+        model,
+        dummy_input,
+        output_path,
+        export_params=True,
+        opset_version=opset_version,
+        do_constant_folding=True,
+        input_names=['speech'],
+        output_names=['embedding'],
+        dynamic_axes={
+            'speech': {0: 'batch_size', 1: 'time'},
+            'embedding': {0: 'batch_size'}
+        },
+        dynamo=False
+    )
+    print(f"Model exported to {output_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Simple Campplus Finetuning")
     parser.add_argument("--config", type=str, default="averaged_config.yaml", help="Path to config file")
     parser.add_argument("--embedding_dir", type=str, default="./embedding_artifacts", help="Embedding artifacts directory")
-    parser.add_argument("--epochs", type=int, default=1, help="Number of epochs to train")
     parser.add_argument("--num_workers", type=int, default=4, help="Number of data loading workers")
     
     args = parser.parse_args()
@@ -325,9 +381,7 @@ def main():
     # Load config
     config = load_config(args.config)
     embedding_dir = Path(args.embedding_dir)
-    
-    # Override epochs from command line
-    config['training']['epochs'] = args.epochs
+
     
     # Set device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -417,7 +471,8 @@ def main():
         
         num_epochs = config['training']['epochs']
         best_loss = float('inf')
-        
+        best_path = None    
+        prev_steps = 0  # To keep track of total steps for MLflow logging
         for epoch in range(num_epochs):
             # Train one epoch
             train_metrics = train_one_epoch(
@@ -426,18 +481,19 @@ def main():
                 config=config,
                 optimizer=optimizer,
                 device=device,
-                epoch=epoch
+                epoch=epoch,
+                prev_steps=prev_steps
             )
             
             # Log metrics
             training_history['train_loss'].append(train_metrics['loss'])
             training_history['train_cosine_similarity'].append(train_metrics['cosine_similarity'])
-            
+            prev_steps += train_metrics['num_batches']
             mlflow.log_metrics({
                 'train_loss': train_metrics['loss'],
                 'train_cosine_similarity': train_metrics['cosine_similarity'],
                 'num_samples': train_metrics['num_samples']
-            }, step=epoch)
+            }, step=prev_steps)
             
             print(f"\nEpoch {epoch + 1}/{num_epochs}")
             print(f"  Train Loss: {train_metrics['loss']:.4f}")
@@ -467,10 +523,18 @@ def main():
                 best_path = checkpoint_dir / "best_model.pt"
                 torch.save(checkpoint, best_path)
                 print(f"  Saved best model to {best_path}")
-        
+                
+
+
         # Log final model
         print("\nLogging model to MLflow...")
         mlflow.pytorch.log_model(model, "model")
+        
+        # also create ONNX model
+        onnx_path = checkpoint_dir / "campplus_finetuned.onnx"
+        print(f"\nExporting ONNX model to {onnx_path}...")
+        export_onnx_model(model, str(onnx_path))
+        mlflow.log_artifact(str(onnx_path))
         
         # Log training history
         history_path = checkpoint_dir / "training_history.json"

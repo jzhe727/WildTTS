@@ -140,7 +140,7 @@ def test_model_py(onnx_path: str, input_tensor: torch.Tensor):
 
 
 
-def compare_outputs(onnx_out, torch_out, pytorch_out):
+def compare_outputs(onnx_out, torch_out, pytorch_out, exported_out=None):
     """Compare outputs from all three methods."""
     print("\n=== Comparison Results ===")
     
@@ -160,6 +160,11 @@ def compare_outputs(onnx_out, torch_out, pytorch_out):
     if torch_out is not None and pytorch_out is not None:
         diff_both = np.abs(torch_out - pytorch_out).max()
         print(f"onnx2torch vs onnx2pytorch max diff: {diff_both:.6e}")
+    
+    if exported_out is not None:
+        diff_exported = np.abs(onnx_out - exported_out).max()
+        print(f"ONNX vs exported ONNX max diff: {diff_exported:.6e}")
+        print(f"  Are they close? {np.allclose(onnx_out, exported_out, atol=1e-5)}")
 
 def test_gradient_flow(model, input_tensor: torch.Tensor):
     """Test if gradients flow through the model."""
@@ -200,10 +205,12 @@ def main():
     
     onnx_path = args.model
     audio_path = args.audio
+
     
     print("=== CAM++ Model Conversion Comparison ===")
     print(f"Model: {onnx_path}")
     print(f"Audio: {audio_path}")
+
     
     # Preprocess audio using same logic as generate_embedding.py
     print("\n=== Preprocessing Audio ===")
@@ -221,9 +228,16 @@ def main():
     onnx_output = test_onnx_runtime(onnx_path, input_np)
     torch_output, torch_model = test_onnx2torch(onnx_path, input_torch)
     custom_model_output, custom_model = test_model_py(onnx_path, input_torch)
+
+    from train_simple import export_onnx_model
+    # test exporting the original model
+    exported_path = "./test_exported.onnx"
+    export_onnx_model(custom_model, exported_path)
+
+    exported_output = test_onnx_runtime(exported_path, input_np)
     
     # Compare outputs
-    compare_outputs(onnx_output, torch_output, custom_model_output)
+    compare_outputs(onnx_output, torch_output, custom_model_output, exported_output)
     
     # Test gradients
     if torch_model is not None:
@@ -240,6 +254,7 @@ def main():
         print("✓ onnx2torch: Working correctly")
     if custom_model_output is not None and np.allclose(onnx_output, custom_model_output, atol=1e-5):
         print("✓ onnx2pytorch: Working correctly")
+
 
 
 if __name__ == "__main__":
