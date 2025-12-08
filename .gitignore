@@ -328,3 +328,4 @@ frontend/[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
 
 training/campplus_finetuning/logs/
 training/campplus_finetuning/data_artifacts/
+training/campplus_finetuning/embedding_artifacts/
