@@ -49,15 +49,22 @@ if python -c 'import torch; print(torch.cuda.is_available())' | grep -q "True"; 
 fi
 echo "=========================================="
 
+CONFIG="averaged_config_multi_epoch"
+
 # Run training
 python train_simple.py \
-    --config averaged_config_multi_epoch.yaml \
+    --config ${CONFIG}.yaml \
     --embedding_dir ./embedding_artifacts/ \
     --num_workers 16
 
 echo "=========================================="
 echo "Training completed at $(date)"
 echo "=========================================="
+
+cd ~/ensf619/WildTTS/
+python training/campplus_finetuning/create_model_directory.py \
+    --source_model_dir backend/CosyVVoice/pretrained_models/CosyVoice2-0.5B/ \
+    --model_dir training/campplus_finetuning/checkpoints/${CONFIG}/
 
 sleep 10
 echo "Finishing up..."
