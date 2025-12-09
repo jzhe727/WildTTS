@@ -520,8 +520,8 @@ def main():
             }
             
             # Save latest checkpoint
-            checkpoint_path = checkpoint_dir / f"checkpoint_epoch_{epoch}.pt"
-            torch.save(checkpoint, checkpoint_path)
+            mlflow.pytorch.log_model(model, f"checkpoint_epoch_{epoch + 1}")
+            print(f"  Saved checkpoint for epoch {epoch + 1} to MLflow")
             
             # Save best checkpoint
             if is_best:
