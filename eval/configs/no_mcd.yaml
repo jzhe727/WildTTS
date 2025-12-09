@@ -1,0 +1,46 @@
+# Comprehensive VERSA Evaluation Configuration
+# This config includes: UTMOS, DNSMOS, WER (Whisper-Large), and Speaker Similarity
+# Created: November 25, 2025
+
+
+# Pseudo-Subjective MOS Metrics
+# Predicts Mean Opinion Score (MOS) without human listeners
+# -- utmos: UT-MOS score (range: 1-5, higher is better)
+# -- dnsmos: DNS-MOS score with multiple sub-scores (range: 1-5, higher is better)
+#    - dnsmos_ovrl: overall quality
+#    - dnsmos_sig: signal quality
+#    - dnsmos_bak: background quality
+- name: pseudo_mos
+  predictor_types: ["utmos", "dnsmos"]
+  predictor_args:
+    utmos:
+      fs: 16000
+    dnsmos:
+      fs: 16000
+
+# Word Error Rate (WER) with OpenAI Whisper Large Model
+# Measures transcription accuracy
+# NOTE: Further aggregation is necessary for corpus-level WER/CER
+# -- whisper_hyp_text: the hypothesis from Whisper ASR decoding
+# -- ref_text: reference text (after cleaner)
+# -- whisper_wer_delete: deletion errors
+# -- whisper_wer_insert: insertion errors
+# -- whisper_wer_replace: replacement errors
+# -- whisper_wer_equal: correct matching words count
+# -- whisper_cer_delete: character deletion errors
+# -- whisper_cer_insert: character insertion errors
+# -- whisper_cer_replace: character replacement errors
+# -- whisper_cer_equal: correct matching characters count
+- name: whisper_wer
+  model_tag: large
+  beam_size: 5
+  text_cleaner: whisper_basic
+
+# Speaker Similarity
+# Measures speaker identity preservation between generated and reference audio
+# -- spk_similarity: speaker cosine similarity (range: -1 to 1, higher is better)
+# Note: Using default ESPnet speaker model (voxcelebs12_rawnet3)
+# For WavLM-based models, you can specify: espnet/voxcelebs12_wavlm or other ESPnet-SPK models
+# from https://huggingface.co/espnet
+- name: speaker
+  model_tag: default
