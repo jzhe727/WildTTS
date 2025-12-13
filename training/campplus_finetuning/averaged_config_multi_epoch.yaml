@@ -20,8 +20,8 @@ campplus:
 
 # Training settings
 training:
-  epochs: 50
-  batch_size: 32
+  epochs: 20
+  batch_size: 64
   learning_rate: 1.0e-4
   weight_decay: 1.0e-5
   lr_scheduler: "cosine"
@@ -35,6 +35,7 @@ training:
   # Checkpointing
   save_every_epochs: 5
   checkpoint_dir: "./checkpoints"
+  use_name_as_subdir: true
   
   # Early stopping
   early_stopping_patience: 10

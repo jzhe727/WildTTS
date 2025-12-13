@@ -17,7 +17,7 @@ PRED_DIR="${PRED_DIR:-titw_generated}"
 OUTPUT_SUFFIX="results"
 CONFIG="configs/utmos.yaml"
 VERSA_DIR="versa"
-TEXT_FILE=""  # Optional text file for WER
+TEXT_FILE="titw-test/metadata/text"
 VERBOSE=""
 
 # Parse arguments
@@ -26,10 +26,6 @@ while [[ $# -gt 0 ]]; do
         comprehensive)
             CONFIG="configs/comprehensive.yaml"
             OUTPUT_SUFFIX="results_comp"
-            # Auto-detect text file for WER
-            if [ -f "titw-test/metadata/text" ]; then
-                TEXT_FILE="titw-test/metadata/text"
-            fi
             shift
             ;;
         custom)

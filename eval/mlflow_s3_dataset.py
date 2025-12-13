@@ -139,13 +139,13 @@ def main():
         print(f"\nDataset stored with run ID: {run_id}")
 
         # if the comprehensive evaluation metrics are available, they can be logged here under the same run
-        eval_folder_name = args.folder_path.name + "_results_comp"
+        eval_folder_name = args.folder_path.name + "_results"
         eval_folder_path = args.folder_path.parent / eval_folder_name
         if eval_folder_path.exists():
             print(f"\nLogging comprehensive evaluation metrics from: {eval_folder_path}")
             create_and_log_dataset(
                 folder_path=eval_folder_path,
-                dataset_name=args.dataset_name + "_results_comp",
+                dataset_name=args.dataset_name + "_results",
                 experiment_name=args.experiment_name,
                 metadata=metadata,
                 description="Comprehensive evaluation metrics",
