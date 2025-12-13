@@ -66,6 +66,14 @@ python training/campplus_finetuning/create_model_directory.py \
     --source_model_dir backend/CosyVVoice/pretrained_models/CosyVoice2-0.5B/ \
     --model_dir training/campplus_finetuning/checkpoints/${CONFIG}/
 
+cd ./eval
+# Generate samples using the newly trained model
+eval "$(conda shell.bash hook)"
+conda activate wildtts
+./generate_titw.sh \
+    --model_dir ../training/campplus_finetuning/checkpoints/${CONFIG}/CosyVoice2-0.5B \
+    --output_dir titw_generated_${CONFIG}/
+
 sleep 10
 echo "Finishing up..."
 

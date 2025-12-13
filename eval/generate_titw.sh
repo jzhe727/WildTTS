@@ -19,6 +19,11 @@ USE_JIT=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --model_dir)
+            MODEL_DIR="$2"
+            shift 2
+            ;;  
+
         --fp16)
             USE_FP16=true
             shift

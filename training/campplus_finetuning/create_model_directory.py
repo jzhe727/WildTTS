@@ -51,10 +51,14 @@ def create_model_directory(model_dir: str, source_model_dir: str, campplus_onnx_
             print(f"Skipping {item.name} (already exists)")
             continue
         
+        # Calculate relative path from target to source for symlinks
+        # Use absolute path to ensure the symlink works correctly
+        source_absolute = item.resolve()
+        
         # Handle directories - create symlinks
         if item.is_dir():
             print(f"Creating symlink for directory: {item.name}")
-            os.symlink(item, target_path)
+            os.symlink(source_absolute, target_path, target_is_directory=True)
         
         # Handle files
         elif item.is_file():
@@ -66,12 +70,12 @@ def create_model_directory(model_dir: str, source_model_dir: str, campplus_onnx_
                 else:
                     print(f"Warning: Finetuned campplus.onnx not found at {campplus_onnx_path}")
                     print("Creating symlink to original instead")
-                    os.symlink(item, target_path)
+                    os.symlink(source_absolute, target_path)
             
             # For .pt and .onnx files, create symlinks
             elif item.suffix in ['.pt', '.onnx']:
                 print(f"Creating symlink for: {item.name}")
-                os.symlink(item, target_path)
+                os.symlink(source_absolute, target_path)
             
             elif item.suffix in ['.txt', '.json', '.yaml', '.yml']:
                 # Copy  small config files instead of symlinking
@@ -80,7 +84,7 @@ def create_model_directory(model_dir: str, source_model_dir: str, campplus_onnx_
             # For other files, create symlinks as well
             else:
                 print(f"Creating symlink for: {item.name}")
-                os.symlink(item, target_path)
+                os.symlink(source_absolute, target_path)
     
     print(f"\nModel directory created successfully at: {target_dir}")
 
