@@ -43,7 +43,7 @@ FISHAUDIO_API_KEY = os.environ.get("FISHAUDIO_API_KEY", None)
 _tts_engines: dict[str, BaseTTS] = {}
 
 # Supported TTS models
-SUPPORTED_MODELS = ["cosyvoice", "fishaudio"]
+SUPPORTED_MODELS = ["cosyvoice", "fishaudio", "fishaudio_enhance"]
 
 
 def get_tts_engine(model: Optional[str] = None) -> BaseTTS:
@@ -83,11 +83,17 @@ def get_tts_engine(model: Optional[str] = None) -> BaseTTS:
             load_vllm=False,
             fp16=False
         )
-    elif engine_name == "fishaudio":
-        _tts_engines[engine_name] = create_tts(
-            "fishaudio",
-            api_key=FISHAUDIO_API_KEY
-        )
+    elif engine_name == "fishaudio" or engine_name == "fishaudio_enhance":
+        # Both fishaudio and fishaudio_enhance use the same FishAudio engine
+        # The difference is in the synthesize call parameters
+        base_engine = "fishaudio"
+        if base_engine not in _tts_engines:
+            _tts_engines[base_engine] = create_tts(
+                "fishaudio",
+                api_key=FISHAUDIO_API_KEY
+            )
+        # Cache the same engine instance for fishaudio_enhance
+        _tts_engines[engine_name] = _tts_engines[base_engine]
     
     return _tts_engines[engine_name]
 
@@ -206,12 +212,20 @@ def synthesize_audio(
     
     # Get TTS engine and synthesize
     tts_engine = get_tts_engine(model=model)
-    tts_engine.synthesize(
-        text=text,
-        prompt_wav_path=reference_audio_path,
-        output_wav_path=str(output_path),
-        style_text=reference_text
-    )
+    
+    # Prepare synthesize kwargs
+    synthesize_kwargs = {
+        "text": text,
+        "prompt_wav_path": reference_audio_path,
+        "output_wav_path": str(output_path),
+        "style_text": reference_text
+    }
+    
+    # Add enhance_audio_quality for fishaudio_enhance model
+    if model_used == "fishaudio_enhance":
+        synthesize_kwargs["enhance_audio_quality"] = True
+    
+    tts_engine.synthesize(**synthesize_kwargs)
     
     # Read the synthesized audio
     with open(output_path, "rb") as f:
@@ -558,6 +572,11 @@ async def get_supported_models():
                     "name": "FishAudio",
                     "type": "cloud",
                     "description": "FishAudio cloud-based TTS API"
+                },
+                "fishaudio_enhance": {
+                    "name": "FishAudio Enhanced",
+                    "type": "cloud",
+                    "description": "FishAudio cloud-based TTS API with enhanced audio quality"
                 }
             }
         }
