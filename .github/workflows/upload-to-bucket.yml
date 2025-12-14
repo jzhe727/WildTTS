@@ -30,7 +30,7 @@ env:
 
 jobs:
   upload:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, arc]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -73,7 +73,7 @@ jobs:
           DEST_FOLDER="${{ github.event.inputs.destination_folder }}"
           DEST_NAME="${{ github.event.inputs.destination_name }}"
           
-          FILE_PATH="training/campplus_finetuning/checkpoints/${CONFIG_NAME}/${CHECKPOINT_NAME}"
+          FILE_PATH="~/ensf619/WildTTS/training/campplus_finetuning/checkpoints/${CONFIG_NAME}/${CHECKPOINT_NAME}"
           
           if [ ! -f "$FILE_PATH" ]; then
             echo "Error: File '$FILE_PATH' not found"
