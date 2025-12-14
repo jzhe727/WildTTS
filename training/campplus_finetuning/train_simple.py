@@ -36,6 +36,8 @@ from torch.utils.data import IterableDataset, DataLoader, get_worker_info
 
 from model import create_model
 
+torch.manual_seed(619)
+
 
 def load_config(config_path: str) -> dict:
     """Load configuration from YAML file."""
@@ -104,15 +106,24 @@ class HFStreamingDataset(IterableDataset):
     def __init__(
         self, 
         config: dict, 
-        speaker_embeddings: Dict[str, torch.Tensor], 
-        subset: str = "easy"
+        averaged_speaker_embeddings: Optional[Dict[str, torch.Tensor]] = None, 
+        speaker_embeddings: Optional[Dict[str, torch.Tensor]] = None,
+        subset: str = "easy",
+        averaged: bool = True
     ):
         self.config = config
+        self.averaged_speaker_embeddings = averaged_speaker_embeddings
         self.speaker_embeddings = speaker_embeddings
         self.subset = subset
         self.dataset_name = config['data']['huggingface_dataset']
         self.num_mel_bins = config['campplus']['num_mel_bins']
-        
+        self.averaged = averaged
+
+        if averaged:
+            assert averaged_speaker_embeddings is not None, "Averaged speaker embeddings must be provided if averaged=True"
+        else:
+            assert speaker_embeddings is not None, "Speaker embeddings must be provided if averaged=False"
+
         # Load dataset in __init__ to avoid concurrent access issues
         print(f"Loading dataset {self.dataset_name} (subset={self.subset})...")
         self.ds = load_dataset(
@@ -139,9 +150,14 @@ class HFStreamingDataset(IterableDataset):
             spk_id = item['speaker_id']
             
             # Skip if speaker not in embeddings
-            if spk_id not in self.speaker_embeddings:
-                skipped_count += 1
-                continue
+            if self.averaged:
+                if spk_id not in self.averaged_speaker_embeddings:
+                    skipped_count += 1
+                    continue
+            else:
+                if spk_id not in self.speaker_embeddings:
+                    skipped_count += 1
+                    continue
             
             try:
                 audio_data = item['audio']
@@ -155,10 +171,18 @@ class HFStreamingDataset(IterableDataset):
                     self.num_mel_bins
                 )
                 
+                if self.averaged:
+                    target_embedding = self.averaged_speaker_embeddings[spk_id]
+                else:
+                    # select random integer and only take that index through pytorch
+                    num_embeddings = self.speaker_embeddings[spk_id].shape[0]
+                    random_idx = torch.randint(0, num_embeddings, (1,)).item()
+                    target_embedding = self.speaker_embeddings[spk_id][random_idx]
+
                 processed_count += 1
                 yield {
                     "features": features,
-                    "target_embedding": self.speaker_embeddings[spk_id],
+                    "target_embedding": target_embedding,
                     "utt_id": utt_id,
                     "spk_id": spk_id
                 }
@@ -379,12 +403,14 @@ def main():
     parser.add_argument("--config", type=str, default="averaged_config.yaml", help="Path to config file")
     parser.add_argument("--embedding_dir", type=str, default="./embedding_artifacts", help="Embedding artifacts directory")
     parser.add_argument("--num_workers", type=int, default=4, help="Number of data loading workers")
-    
+    parser.add_argument("--averaged", type=bool, default=True, help="Use averaged speaker embeddings or not")
+
     args = parser.parse_args()
     
     # Load config
     config = load_config(args.config)
     embedding_dir = Path(args.embedding_dir)
+    averaged = args.averaged
 
     
     # Set device
@@ -397,12 +423,24 @@ def main():
     
     # Load speaker embedding lookup (mean embeddings)
     print("\nLoading speaker embeddings...")
-    speaker_embedding_file = embedding_dir / "speaker_embedding_lookup.pt"
-    if not speaker_embedding_file.exists():
-        print(f"Error: {speaker_embedding_file} not found. Run generate_target_embeddings.py first.")
-        sys.exit(1)
-    
-    speaker_embeddings = torch.load(speaker_embedding_file)
+    if averaged:
+        speaker_embedding_file = embedding_dir / "speaker_embedding_lookup.pt"
+        if not speaker_embedding_file.exists():
+            print(f"Error: {speaker_embedding_file} not found. Run generate_target_embeddings.py first.")
+            sys.exit(1)
+        speaker_embeddings = torch.load(speaker_embedding_file)
+    else:
+        speaker_embedding_file = embedding_dir / "target_embeddings.pt"
+        if not speaker_embedding_file.exists():
+            print(f"Error: {speaker_embedding_file} not found. Run generate_target_embeddings.py first.")
+            sys.exit(1)
+        speaker_embeddings = torch.load(speaker_embedding_file)
+        speaker_embeddings = {
+            spk_id: torch.tensor(data["embeddings"])
+            for spk_id, data in speaker_embeddings.items()
+        }
+
+
     print(f"Loaded embeddings for {len(speaker_embeddings)} speakers")
     
     # Setup MLflow
@@ -448,7 +486,7 @@ def main():
         print(f"\nInitializing dataset with {args.num_workers} workers...")
         dataset = HFStreamingDataset(
             config=config,
-            speaker_embeddings=speaker_embeddings,
+            averaged_speaker_embeddings=speaker_embeddings,
             subset="easy"
         )
         
