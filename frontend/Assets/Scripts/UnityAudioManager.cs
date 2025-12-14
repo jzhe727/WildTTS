@@ -137,10 +137,28 @@ public class UnityAudioManager : MonoBehaviour
                 Debug.Log($"Supported models: {response}");
                 
                 // Parse JSON response to get supported models
-                // Simple parsing - in production use JsonUtility or Newtonsoft.Json
-                if (response.Contains("supported_models"))
+                try
                 {
-                    OnStatusUpdate?.Invoke("Connected to server. Models loaded.");
+                    ModelsResponse modelsResponse = JsonUtility.FromJson<ModelsResponse>(response);
+                    if (modelsResponse != null && modelsResponse.supported_models != null && modelsResponse.supported_models.Length > 0)
+                    {
+                        supportedModels = modelsResponse.supported_models;
+                        
+                        // Update dropdown with fetched models
+                        if (modelDropdown != null)
+                        {
+                            modelDropdown.ClearOptions();
+                            modelDropdown.AddOptions(new System.Collections.Generic.List<string>(supportedModels));
+                            Debug.Log($"Loaded {supportedModels.Length} models: {string.Join(", ", supportedModels)}");
+                        }
+                        
+                        OnStatusUpdate?.Invoke($"Connected to server. {supportedModels.Length} models loaded.");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"Failed to parse models response: {e.Message}");
+                    OnStatusUpdate?.Invoke("Connected to server. Using default models.");
                 }
             }
             else
@@ -148,6 +166,17 @@ public class UnityAudioManager : MonoBehaviour
                 Debug.LogWarning($"Failed to fetch models: {www.error}");
             }
         }
+    }
+    
+    /// <summary>
+    /// Helper class for parsing JSON response from /audio/models endpoint
+    /// </summary>
+    [System.Serializable]
+    private class ModelsResponse
+    {
+        public string status;
+        public string default_model;
+        public string[] supported_models;
     }
 
     /// <summary>

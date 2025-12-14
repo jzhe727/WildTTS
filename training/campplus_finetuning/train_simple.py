@@ -588,6 +588,13 @@ def run_epoch_evaluation(
     output_gen_dir = epoch_eval_dir / "generated"
     print(f"Generating TTS samples to: {output_gen_dir}")
     
+    # use absolute paths 
+    subset_metadata_dir = subset_metadata_dir.resolve()
+    titw_test_dir = titw_test_dir.resolve()
+    output_gen_dir = output_gen_dir.resolve()
+    mock_model_dir = mock_model_dir.resolve()
+    eval_dir = eval_dir.resolve()
+
     generate_cmd = [
         "bash", "-c",
         f"eval \"$(conda shell.bash hook)\" && "
