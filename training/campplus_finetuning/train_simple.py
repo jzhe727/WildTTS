@@ -623,7 +623,7 @@ def run_epoch_evaluation(
     
     # Step 5: Run evaluation using wildtts-versa conda env
     eval_output_dir = epoch_eval_dir / "eval_results"
-    eval_config = eval_dir / "configs" / "utmos.yaml"
+    eval_config = eval_dir / "configs" / "no_mcd.yaml"
     versa_dir = eval_dir / "versa"
     
     

@@ -49,7 +49,7 @@ if python -c 'import torch; print(torch.cuda.is_available())' | grep -q "True"; 
 fi
 echo "=========================================="
 
-CONFIG="averaged_config_multi_epoch"
+CONFIG="top10_config_multi_epoch"
 
 # Run training with epoch evaluation
 # --eval_samples: Number of random TITW samples to evaluate per epoch
@@ -60,10 +60,11 @@ python train_simple.py \
     --config ${CONFIG}.yaml \
     --embedding_dir ./embedding_artifacts/ \
     --num_workers 16 \
+    --averaged false \
     --eval_samples 100 \
     --source_model_dir ~/ensf619/WildTTS/backend/CosyVoice/pretrained_models/CosyVoice2-0.5B \
     --titw_test_dir ~/ensf619/WildTTS/eval/titw-test \
-    --eval_dir ~/ensf619/WildTTS/eval
+    --eval_dir ~/ensf619/WildTTS/eval 
 
 echo "=========================================="
 echo "Training completed at $(date)"
