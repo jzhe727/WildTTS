@@ -17,6 +17,7 @@ import sys
 import json
 from datetime import datetime
 from typing import Optional
+import logging
 
 # Add training directory to path for importing create_model_directory
 sys.path.insert(0, str(Path(__file__).parent.parent / "training" / "campplus_finetuning"))
@@ -69,6 +70,8 @@ def get_finetuned_campplus_models() -> list[str]:
         List of finetuned model names (e.g., ['cosyvoice_averaged_config', 'cosyvoice_top10_config'])
     """
     finetuned_models = []
+
+    logging.info(f"{CUSTOM_CAMPPLUS_DIR} exists: {CUSTOM_CAMPPLUS_DIR.exists()}")
     
     if not CUSTOM_CAMPPLUS_DIR.exists():
         return finetuned_models
@@ -669,6 +672,10 @@ async def get_supported_models_endpoint():
             "description": f"CosyVoice2-0.5B with finetuned campplus model: {finetuned_name}"
         }
     
+    logging.info(f"Supported models: {get_supported_models_list()}")
+    logging.info(f"Finetuned models: {finetuned_models}")
+    logging.info(f"Supported models info: {model_info}")
+
     return JSONResponse(
         status_code=200,
         content={
