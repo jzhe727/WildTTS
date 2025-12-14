@@ -19,10 +19,7 @@ from datetime import datetime
 from typing import Optional
 import logging
 
-# Add training directory to path for importing create_model_directory
-sys.path.insert(0, str(Path(__file__).parent.parent / "training" / "campplus_finetuning"))
 from create_model_directory import create_model_directory
-
 from tts import create_tts, BaseTTS
 
 app = FastAPI(
