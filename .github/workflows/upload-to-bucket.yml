@@ -1,0 +1,95 @@
+name: Upload Custom Model to GCS Bucket
+
+on:
+  workflow_dispatch:
+    inputs:
+      config_name:
+        description: 'Subfolder of the model to upload'
+        required: true
+        type: string
+      checkpoint_name:
+        description: 'Checkpoint name of the model to upload'
+        required: false
+        type: string
+        default: campplus_finetuned.onnx
+      destination_folder:
+        description: 'Destination folder in the bucket (default: uploads)'
+        required: false
+        type: string
+        default: 'custom_campplus_models'
+      destination_name:
+        description: 'Destination name for the uploaded file (default: config_name.onnx)'
+        required: false
+        type: string
+        default: ''
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GAR_LOCATION: northamerica-northeast2
+  MODEL_BUCKET_NAME: "wildtts-models-1764630482"
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Sanitize and validate inputs
+        id: sanitize
+        run: |
+          # Sanitize inputs to prevent path traversal
+          CONFIG_NAME=$(basename "${{ github.event.inputs.config_name }}")
+          CHECKPOINT_NAME=$(basename "${{ github.event.inputs.checkpoint_name }}")
+          
+          # Validate config_name contains only safe characters
+          if [[ ! "$CONFIG_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+            echo "Error: config_name must only contain alphanumeric characters, underscores, and hyphens"
+            exit 1
+          fi
+          
+          # Validate checkpoint_name contains only safe characters (allowing dots for file extension)
+          if [[ ! "$CHECKPOINT_NAME" =~ ^[a-zA-Z0-9_.-]+$ ]]; then
+            echo "Error: checkpoint_name must only contain alphanumeric characters, underscores, hyphens, and dots"
+            exit 1
+          fi
+          
+          # Export sanitized values for subsequent steps
+          echo "config_name=$CONFIG_NAME" >> $GITHUB_OUTPUT
+          echo "checkpoint_name=$CHECKPOINT_NAME" >> $GITHUB_OUTPUT
+
+      - name: Upload file to GCS bucket
+        run: |
+          CONFIG_NAME="${{ steps.sanitize.outputs.config_name }}"
+          CHECKPOINT_NAME="${{ steps.sanitize.outputs.checkpoint_name }}"
+          DEST_FOLDER="${{ github.event.inputs.destination_folder }}"
+          DEST_NAME="${{ github.event.inputs.destination_name }}"
+          
+          FILE_PATH="training/campplus_finetuning/checkpoints/${CONFIG_NAME}/${CHECKPOINT_NAME}"
+          
+          if [ ! -f "$FILE_PATH" ]; then
+            echo "Error: File '$FILE_PATH' not found"
+            exit 1
+          fi
+          
+          # Use destination_name if provided, otherwise use config_name.onnx
+          if [ -z "$DEST_NAME" ]; then
+            DEST_NAME="${CONFIG_NAME}.onnx"
+          fi
+          
+          DESTINATION="gs://${{ env.MODEL_BUCKET_NAME }}/${DEST_FOLDER}/${DEST_NAME}"
+          
+          echo "Uploading '$FILE_PATH' to '$DESTINATION'..."
+          gsutil cp "$FILE_PATH" "$DESTINATION"
+          
+          echo "Upload complete!"
+          echo "File uploaded to: $DESTINATION"
+

@@ -9,6 +9,9 @@
 #   ./eval_versa.sh comprehensive      # Use comprehensive config with multiple metrics
 #   ./eval_versa.sh custom /path/to/config.yaml /path/to/output
 
+eval "$(conda shell.bash hook)"
+conda activate wildtts-versa
+
 set -e  # Exit on error
 
 # Default settings

@@ -204,6 +204,46 @@ def compute_statistics(results: Dict, logger) -> Dict:
         else:
             logger.warning(f"{metric}: No numeric scores found")
     
+    # Calculate WER from word stats
+
+    """
+    "whisper_wer_delete": {
+    "mean": 0.33897932248130225,
+    "min": 0,
+    "max": 18,
+    "count": 9092
+  },
+  "whisper_wer_equal": {
+    "mean": 9.79762428508579,
+    "min": 0,
+    "max": 45,
+    "count": 9092
+  },
+  "whisper_wer_insert": {
+    "mean": 0.18554773427188737,
+    "min": 0,
+    "max": 15,
+    "count": 9092
+  },
+  "whisper_wer_replace": {
+    "mean": 0.4965904091509019,
+    "min": 0,
+    "max": 37,
+    "count": 9092
+  }
+    """
+    wer_stats = ["whisper_wer_delete", "whisper_wer_equal", "whisper_wer_insert", "whisper_wer_replace"]
+    if all(stat in stats for stat in wer_stats):
+        original_length = stats["whisper_wer_equal"]["mean"] + stats["whisper_wer_delete"]["mean"] + stats["whisper_wer_replace"]["mean"]
+        whisper_wer_percentage = (stats["whisper_wer_delete"]["mean"] + stats["whisper_wer_insert"]["mean"] + stats["whisper_wer_replace"]["mean"]) / original_length * 100
+        stats["whisper_wer_percentage"] = {
+            
+            "mean": whisper_wer_percentage,
+            "min": 0.0,
+            "max": 0.0,
+            "count": 1,
+        }
+
     return stats
 
 
@@ -371,14 +411,15 @@ def main():
         gt_scp = args.gt_scp
         pred_scp = args.pred_scp
     else:
-        logger.info("Creating SCP files from directories")
-        try:
-            gt_scp, pred_scp = create_scp_files(
-                args.gt_dir, args.pred_dir, args.output_dir, logger
-            )
-        except Exception as e:
-            logger.error(f"Failed to create SCP files: {e}")
-            return 1
+        if not args.skip_versa:
+            logger.info("Creating SCP files from directories")
+            try:
+                gt_scp, pred_scp = create_scp_files(
+                    args.gt_dir, args.pred_dir, args.output_dir, logger
+                )
+            except Exception as e:
+                logger.error(f"Failed to create SCP files: {e}")
+                return 1
     
     # Run VERSA evaluation
     result_file = args.output_dir / "results.jsonl"
