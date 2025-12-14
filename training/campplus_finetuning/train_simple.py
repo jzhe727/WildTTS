@@ -588,6 +588,17 @@ def run_epoch_evaluation(
     output_gen_dir = epoch_eval_dir / "generated"
     print(f"Generating TTS samples to: {output_gen_dir}")
     
+    # Step 5: Setup eval output directory before resolving paths
+    eval_output_dir = epoch_eval_dir / "eval_results"
+    
+    # use absolute paths 
+    subset_metadata_dir = subset_metadata_dir.resolve()
+    titw_test_dir = titw_test_dir.resolve()
+    output_gen_dir = output_gen_dir.resolve()
+    mock_model_dir = mock_model_dir.resolve()
+    eval_dir = eval_dir.resolve()
+    eval_output_dir = eval_output_dir.resolve()
+
     generate_cmd = [
         "bash", "-c",
         f"eval \"$(conda shell.bash hook)\" && "
@@ -622,7 +633,6 @@ def run_epoch_evaluation(
         return {'error': 'generation_timeout', 'epoch': epoch + 1}
     
     # Step 5: Run evaluation using wildtts-versa conda env
-    eval_output_dir = epoch_eval_dir / "eval_results"
     eval_config = eval_dir / "configs" / "no_mcd.yaml"
     versa_dir = eval_dir / "versa"
     

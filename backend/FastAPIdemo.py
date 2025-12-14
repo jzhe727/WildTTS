@@ -13,9 +13,14 @@ from pathlib import Path
 import shutil
 import uvicorn
 import os
+import sys
 import json
 from datetime import datetime
 from typing import Optional
+
+# Add training directory to path for importing create_model_directory
+sys.path.insert(0, str(Path(__file__).parent.parent / "training" / "campplus_finetuning"))
+from create_model_directory import create_model_directory
 
 from tts import create_tts, BaseTTS
 
@@ -39,11 +44,55 @@ TTS_ENGINE = os.environ.get("TTS_ENGINE", "cosyvoice")
 TTS_MODEL_PATH = os.environ.get("TTS_MODEL_PATH", "CosyVoice/pretrained_models/CosyVoice2-0.5B")
 FISHAUDIO_API_KEY = os.environ.get("FISHAUDIO_API_KEY", None)
 
+# Custom campplus models directory (where finetuned .onnx files are stored)
+CUSTOM_CAMPPLUS_DIR = Path(os.environ.get(
+    "CUSTOM_CAMPPLUS_DIR", 
+    "CosyVoice/pretrained_models/custom_campplus_models"
+))
+
+# Directory for symlinked model directories with custom campplus
+CUSTOM_MODEL_DIR = Path("custom_models")
+CUSTOM_MODEL_DIR.mkdir(exist_ok=True)
+
 # Initialize TTS engines (lazy loading) - cache for each engine type
 _tts_engines: dict[str, BaseTTS] = {}
 
-# Supported TTS models
-SUPPORTED_MODELS = ["cosyvoice", "fishaudio", "fishaudio_enhance"]
+# Base supported TTS models (finetuned variants added dynamically)
+BASE_SUPPORTED_MODELS = ["cosyvoice", "fishaudio", "fishaudio_enhance"]
+
+
+def get_finetuned_campplus_models() -> list[str]:
+    """
+    Scan the custom campplus directory for available finetuned models.
+    
+    Returns:
+        List of finetuned model names (e.g., ['cosyvoice_averaged_config', 'cosyvoice_top10_config'])
+    """
+    finetuned_models = []
+    
+    if not CUSTOM_CAMPPLUS_DIR.exists():
+        return finetuned_models
+    
+    for onnx_file in CUSTOM_CAMPPLUS_DIR.glob("*.onnx"):
+        # Extract model name from filename (e.g., "averaged_config.onnx" -> "cosyvoice_averaged_config")
+        model_name = onnx_file.stem  # Remove .onnx extension
+        finetuned_models.append(f"cosyvoice_{model_name}")
+    
+    return finetuned_models
+
+
+def get_supported_models_list() -> list[str]:
+    """
+    Get the full list of supported models including finetuned variants.
+    
+    Returns:
+        List of all supported model names
+    """
+    return BASE_SUPPORTED_MODELS + get_finetuned_campplus_models()
+
+
+# For backwards compatibility
+SUPPORTED_MODELS = BASE_SUPPORTED_MODELS
 
 
 def get_tts_engine(model: Optional[str] = None) -> BaseTTS:
@@ -51,7 +100,7 @@ def get_tts_engine(model: Optional[str] = None) -> BaseTTS:
     Get or initialize a TTS engine (lazy loading with caching).
     
     Args:
-        model: TTS model name ('cosyvoice' or 'fishaudio'). 
+        model: TTS model name ('cosyvoice', 'cosyvoice_<finetuned>', or 'fishaudio'). 
                If None, uses the default TTS_ENGINE from environment.
     
     Returns:
@@ -62,11 +111,14 @@ def get_tts_engine(model: Optional[str] = None) -> BaseTTS:
     # Use default engine if not specified
     engine_name = model.lower() if model else TTS_ENGINE
     
+    # Get dynamically updated supported models list
+    supported_models = get_supported_models_list()
+    
     # Validate engine name
-    if engine_name not in SUPPORTED_MODELS:
+    if engine_name not in supported_models:
         raise ValueError(
             f"Unsupported TTS model: {engine_name}. "
-            f"Supported models: {', '.join(SUPPORTED_MODELS)}"
+            f"Supported models: {', '.join(supported_models)}"
         )
     
     # Return cached engine if available
@@ -78,6 +130,38 @@ def get_tts_engine(model: Optional[str] = None) -> BaseTTS:
         _tts_engines[engine_name] = create_tts(
             "cosyvoice",
             model_path=TTS_MODEL_PATH,
+            load_jit=False,
+            load_trt=False,
+            load_vllm=False,
+            fp16=False
+        )
+    elif engine_name.startswith("cosyvoice_"):
+        # Finetuned cosyvoice model with custom campplus
+        finetuned_name = engine_name[len("cosyvoice_"):]  # e.g., "averaged_config"
+        custom_onnx_path = CUSTOM_CAMPPLUS_DIR / f"{finetuned_name}.onnx"
+        
+        if not custom_onnx_path.exists():
+            raise ValueError(f"Finetuned model not found: {custom_onnx_path}")
+        
+        # Create symlinked model directory with custom campplus.onnx
+        custom_model_path = CUSTOM_MODEL_DIR / f"CosyVoice2-0.5B_{finetuned_name}"
+        
+        if not custom_model_path.exists():
+            source_model_dir = Path(TTS_MODEL_PATH)
+            print(f"Creating custom model directory for {finetuned_name}...")
+            create_model_directory(
+                model_dir=str(custom_model_path.parent),
+                source_model_dir=str(source_model_dir),
+                campplus_onnx_path=str(custom_onnx_path)
+            )
+            # Rename the created directory to match our naming convention
+            created_dir = custom_model_path.parent / "CosyVoice2-0.5B"
+            if created_dir.exists() and created_dir != custom_model_path:
+                created_dir.rename(custom_model_path)
+        
+        _tts_engines[engine_name] = create_tts(
+            "cosyvoice",
+            model_path=str(custom_model_path),
             load_jit=False,
             load_trt=False,
             load_vllm=False,
@@ -532,7 +616,7 @@ async def root():
         "message": "Audio API Demo is active",
         "version": "4.1.0",
         "default_tts_engine": TTS_ENGINE,
-        "supported_models": SUPPORTED_MODELS,
+        "supported_models": get_supported_models_list(),
         "unity_functions": {
             "1_save_reference": "POST /audio/reference - Upload reference audio + text for voice cloning",
             "2_playback_local": "No server communication needed",
@@ -549,36 +633,51 @@ async def root():
 
 
 @app.get("/audio/models")
-async def get_supported_models():
+async def get_supported_models_endpoint():
     """
     Returns the list of supported TTS models.
     
     Returns:
         JSON with supported models and default model
     """
+    # Build model info dynamically
+    model_info = {
+        "cosyvoice": {
+            "name": "CosyVoice2",
+            "type": "local",
+            "description": "CosyVoice2-0.5B local TTS model"
+        },
+        "fishaudio": {
+            "name": "FishAudio",
+            "type": "cloud",
+            "description": "FishAudio cloud-based TTS API"
+        },
+        "fishaudio_enhance": {
+            "name": "FishAudio Enhanced",
+            "type": "cloud",
+            "description": "FishAudio cloud-based TTS API with enhanced audio quality"
+        }
+    }
+    
+    # Add finetuned models dynamically
+    finetuned_models = get_finetuned_campplus_models()
+    for model_name in finetuned_models:
+        finetuned_name = model_name[len("cosyvoice_"):]  # e.g., "averaged_config"
+        model_info[model_name] = {
+            "name": f"CosyVoice2 ({finetuned_name})",
+            "type": "local",
+            "description": f"CosyVoice2-0.5B with finetuned campplus model: {finetuned_name}"
+        }
+    
     return JSONResponse(
         status_code=200,
         content={
             "status": "success",
             "default_model": TTS_ENGINE,
-            "supported_models": SUPPORTED_MODELS,
-            "model_info": {
-                "cosyvoice": {
-                    "name": "CosyVoice2",
-                    "type": "local",
-                    "description": "CosyVoice2-0.5B local TTS model"
-                },
-                "fishaudio": {
-                    "name": "FishAudio",
-                    "type": "cloud",
-                    "description": "FishAudio cloud-based TTS API"
-                },
-                "fishaudio_enhance": {
-                    "name": "FishAudio Enhanced",
-                    "type": "cloud",
-                    "description": "FishAudio cloud-based TTS API with enhanced audio quality"
-                }
-            }
+            "supported_models": get_supported_models_list(),
+            "base_models": BASE_SUPPORTED_MODELS,
+            "finetuned_models": finetuned_models,
+            "model_info": model_info
         }
     )
 
