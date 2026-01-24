@@ -17,7 +17,7 @@ env:
   REPOSITORY: my-app-repo
   SERVICE: wildtts-backend
   REGION: northamerica-northeast2
-  MODEL_BUCKET_NAME: "wildtts-models-1764630482" 
+  MODEL_BUCKET_NAME: "wildtts-model-2983764" 
 
 jobs:
   deploy:
