@@ -22,7 +22,7 @@ import logging
 from create_model_directory import create_model_directory
 from tts import create_tts, BaseTTS
 
-logging.getLogger('matplotlib').setLevel(logging.DEBUG)  # Cosyvoice uses this logger, so we will as well
+logging.getLogger().setLevel(logging.DEBUG)  # Cosyvoice uses this logger, so we will as well
 
 app = FastAPI(
     title="Audio API Demo",
