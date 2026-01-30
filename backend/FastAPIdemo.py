@@ -181,7 +181,7 @@ def get_tts_engine(model: Optional[str] = None) -> BaseTTS:
             )
         # Cache the same engine instance for fishaudio_enhance
         _tts_engines[engine_name] = _tts_engines[base_engine]
-    logging.INFO(f"Engine {engine_name} created.")
+    logging.info(f"Engine {engine_name} created.")
     return _tts_engines[engine_name]
 
 
@@ -494,6 +494,7 @@ async def synthesize_and_return(
     except HTTPException:
         raise
     except Exception as e:
+        logging.exception("Synthesis error")
         raise HTTPException(status_code=500, detail=f"Synthesis failed: {str(e)}")
 
 
