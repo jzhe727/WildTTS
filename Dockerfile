@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
     espeak-ng \
     libsndfile1 \
     build-essential\
-    ffmpeg \
+    ffmpeg 
 
 # RUN apt-get install -y wget xz-utils && \
 #     wget https://www.johnvansickle.com/ffmpeg/old-releases/ffmpeg-6.0.1-amd64-static.tar.xz && \
