@@ -1,6 +1,6 @@
 
-FROM python:3.10-slim
-
+# FROM python:3.10-slim
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
 RUN apt-get update && apt-get install -y \
     git \
@@ -18,10 +18,19 @@ RUN apt-get install -y wget xz-utils && \
     rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
+ARG VENV_NAME="cosyvoice"
+ENV VENV=$VENV_NAME
+
+RUN conda create -y -n ${VENV} python=3.10
+ENV CONDA_DEFAULT_ENV=${VENV}
+ENV PATH /opt/conda/bin:/opt/conda/envs/${VENV}/bin:$PATH
+
+RUN conda activate ${VENV} && conda install -y -c conda-forge pynini==2.1.5
+
 COPY backend/CosyVoice/requirements.txt ./backend/CosyVoice/requirements.txt
-RUN pip install --no-cache-dir -r backend/CosyVoice/requirements.txt
+RUN conda activate ${VENV} && pip install --no-cache-dir -r backend/CosyVoice/requirements.txt
 COPY backend/requirements.txt ./backend/requirements.txt
-RUN pip install --no-cache-dir -r backend/requirements.txt
+RUN conda activate ${VENV} && pip install --no-cache-dir -r backend/requirements.txt
 
 
 COPY backend ./backend
@@ -33,4 +42,6 @@ RUN mkdir -p /app/backend/CosyVoice/pretrained_models
 
 WORKDIR /app/backend
 
-CMD ["uvicorn", "FastAPIdemo:app", "--host", "0.0.0.0", "--port", "8080"]
+RUN chmod +x ./entrypoint.sh
+
+CMD ["./entrypoint.sh"]
