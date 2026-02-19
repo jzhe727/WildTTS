@@ -7,15 +7,17 @@ RUN apt-get update && apt-get install -y \
     git-lfs \
     espeak-ng \
     libsndfile1 \
-    build-essential
+    build-essential\
+    ffmpeg \
 
-RUN apt-get install -y wget xz-utils && \
-    wget https://www.johnvansickle.com/ffmpeg/old-releases/ffmpeg-6.0.1-amd64-static.tar.xz && \
-    tar xvf ffmpeg-6.0.1-amd64-static.tar.xz && \
-    mv ffmpeg-6.0.1-amd64-static/ffmpeg /usr/local/bin/ && \
-    mv ffmpeg-6.0.1-amd64-static/ffprobe /usr/local/bin/ && \
-    rm -rf ffmpeg-6.0.1-amd64-static* && \
-    rm -rf /var/lib/apt/lists/*
+# RUN apt-get install -y wget xz-utils && \
+#     wget https://www.johnvansickle.com/ffmpeg/old-releases/ffmpeg-6.0.1-amd64-static.tar.xz && \
+#     tar xvf ffmpeg-6.0.1-amd64-static.tar.xz && \
+#     mv ffmpeg-6.0.1-amd64-static/ffmpeg /usr/local/bin/ && \
+#     mv ffmpeg-6.0.1-amd64-static/ffprobe /usr/local/bin/ && \
+#     rm -rf ffmpeg-6.0.1-amd64-static* && \
+#     rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 ARG VENV_NAME="cosyvoice"
