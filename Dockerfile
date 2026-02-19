@@ -20,6 +20,24 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
+# ==================================================================
+# conda install and conda forge channel as default
+# ------------------------------------------------------------------
+# Install miniforge
+RUN wget --quiet https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O ~/miniforge.sh && \
+    /bin/bash ~/miniforge.sh -b -p /opt/conda && \
+    rm ~/miniforge.sh && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo "source /opt/conda/etc/profile.d/conda.sh" >> /opt/nvidia/entrypoint.d/100.conda.sh && \
+    echo "source /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
+    echo "conda activate ${VENV}" >> /opt/nvidia/entrypoint.d/110.conda_default_env.sh && \
+    echo "conda activate ${VENV}" >> $HOME/.bashrc
+
+ENV PATH /opt/conda/bin:$PATH
+
+RUN conda config --add channels conda-forge && \
+    conda config --set channel_priority strict
+
 ARG VENV_NAME="cosyvoice"
 ENV VENV=$VENV_NAME
 
@@ -30,7 +48,9 @@ ENV PATH /opt/conda/bin:/opt/conda/envs/${VENV}/bin:$PATH
 RUN conda activate ${VENV} && conda install -y -c conda-forge pynini==2.1.5
 
 COPY backend/CosyVoice/requirements.txt ./backend/CosyVoice/requirements.txt
-RUN conda activate ${VENV} && pip install --no-cache-dir -r backend/CosyVoice/requirements.txt
+RUN conda activate ${VENV} && \
+    pip install "setuptools<81.0.0" && \
+    pip install --no-cache-dir -r backend/CosyVoice/requirements.txt
 COPY backend/requirements.txt ./backend/requirements.txt
 RUN conda activate ${VENV} && pip install --no-cache-dir -r backend/requirements.txt
 
