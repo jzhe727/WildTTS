@@ -2,6 +2,7 @@
 # FROM python:3.10-slim
 FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
+SHELL ["/bin/bash", "--login", "-c"]
 
 RUN apt-get update -y --fix-missing
 RUN apt-get install -y git build-essential curl wget ffmpeg unzip git git-lfs sox libsox-dev && \
@@ -36,7 +37,6 @@ RUN wget --quiet https://github.com/conda-forge/miniforge/releases/latest/downlo
     echo "conda activate ${VENV}" >> /opt/nvidia/entrypoint.d/110.conda_default_env.sh && \
     echo "conda activate ${VENV}" >> $HOME/.bashrc
 
-ENV PATH /opt/conda/bin:$PATH
 
 RUN conda config --add channels conda-forge && \
     conda config --set channel_priority strict
@@ -46,7 +46,7 @@ ENV VENV=$VENV_NAME
 
 RUN conda create -y -n ${VENV} python=3.10
 ENV CONDA_DEFAULT_ENV=${VENV}
-ENV PATH /opt/conda/bin:/opt/conda/envs/${VENV}/bin:$PATH
+ENV PATH=/opt/conda/bin:/opt/conda/envs/${VENV}/bin:$PATH
 
 RUN conda activate ${VENV} && conda install -y -c conda-forge pynini==2.1.5
 
