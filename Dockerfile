@@ -51,11 +51,11 @@ ENV PATH=/opt/conda/bin:/opt/conda/envs/${VENV}/bin:$PATH
 RUN conda activate ${VENV} && conda install -y -c conda-forge pynini==2.1.5
 
 COPY backend/CosyVoice/requirements.txt ./backend/CosyVoice/requirements.txt
+RUN sed -i '/^openai-whisper/d' backend/CosyVoice/requirements.txt
 RUN conda activate ${VENV} && \
-    pip install "setuptools<81.0.0" && \
+    pip install --no-cache-dir git+https://github.com/openai/whisper.git && \
     pip install --no-cache-dir -r backend/CosyVoice/requirements.txt
-COPY backend/requirements.txt ./backend/requirements.txt
-RUN conda activate ${VENV} && pip install --no-cache-dir -r backend/requirements.txt
+
 
 
 COPY backend ./backend
