@@ -67,6 +67,6 @@ RUN mkdir -p /app/backend/CosyVoice/pretrained_models
 
 WORKDIR /app/backend
 
-RUN chmod +x ./entrypoint.sh
+RUN chmod +x ./entrypoint-conda.sh
 
-CMD ["./entrypoint.sh"]
+CMD ["./entrypoint-conda.sh"]
