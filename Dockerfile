@@ -2,13 +2,16 @@
 # FROM python:3.10-slim
 FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
 
-RUN apt-get update && apt-get install -y \
-    git \
-    git-lfs \
+
+RUN apt-get update -y --fix-missing
+RUN apt-get install -y git build-essential curl wget ffmpeg unzip git git-lfs sox libsox-dev && \
+    apt-get clean && \
+    git lfs install
+
+
+RUN apt-get install -y \
     espeak-ng \
-    libsndfile1 \
-    build-essential\
-    ffmpeg 
+    libsndfile1
 
 # RUN apt-get install -y wget xz-utils && \
 #     wget https://www.johnvansickle.com/ffmpeg/old-releases/ffmpeg-6.0.1-amd64-static.tar.xz && \
