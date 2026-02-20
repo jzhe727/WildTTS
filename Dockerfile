@@ -54,8 +54,8 @@ COPY backend/CosyVoice/requirements.txt ./backend/CosyVoice/requirements.txt
 RUN sed -i '/^openai-whisper/d' backend/CosyVoice/requirements.txt
 RUN conda activate ${VENV} && \
     pip install --no-cache-dir git+https://github.com/openai/whisper.git && \
-    pip install --no-cache-dir -r backend/CosyVoice/requirements.txt
-
+    pip install --no-cache-dir -r backend/CosyVoice/requirements.txt && \
+    pip install --force-reinstall "setuptools<81"
 
 
 COPY backend ./backend
