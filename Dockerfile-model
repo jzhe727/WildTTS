@@ -1,26 +1,61 @@
-FROM python:3.10-slim
+
+# FROM python:3.10-slim
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+
+SHELL ["/bin/bash", "--login", "-c"]
+
+RUN apt-get update -y --fix-missing
+RUN apt-get install -y git build-essential curl wget ffmpeg unzip git git-lfs sox libsox-dev && \
+    apt-get clean && \
+    git lfs install
 
 
-RUN apt-get update && apt-get install -y \
-    git \
-    git-lfs \
+RUN apt-get install -y \
     espeak-ng \
-    libsndfile1 \
-    build-essential
+    libsndfile1
 
-RUN apt-get install -y wget xz-utils && \
-    wget https://www.johnvansickle.com/ffmpeg/old-releases/ffmpeg-6.0.1-amd64-static.tar.xz && \
-    tar xvf ffmpeg-6.0.1-amd64-static.tar.xz && \
-    mv ffmpeg-6.0.1-amd64-static/ffmpeg /usr/local/bin/ && \
-    mv ffmpeg-6.0.1-amd64-static/ffprobe /usr/local/bin/ && \
-    rm -rf ffmpeg-6.0.1-amd64-static* && \
-    rm -rf /var/lib/apt/lists/*
+# RUN apt-get install -y wget xz-utils && \
+#     wget https://www.johnvansickle.com/ffmpeg/old-releases/ffmpeg-6.0.1-amd64-static.tar.xz && \
+#     tar xvf ffmpeg-6.0.1-amd64-static.tar.xz && \
+#     mv ffmpeg-6.0.1-amd64-static/ffmpeg /usr/local/bin/ && \
+#     mv ffmpeg-6.0.1-amd64-static/ffprobe /usr/local/bin/ && \
+#     rm -rf ffmpeg-6.0.1-amd64-static* && \
+#     rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
+# ==================================================================
+# conda install and conda forge channel as default
+# ------------------------------------------------------------------
+# Install miniforge
+RUN wget --quiet https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O ~/miniforge.sh && \
+    /bin/bash ~/miniforge.sh -b -p /opt/conda && \
+    rm ~/miniforge.sh && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo "source /opt/conda/etc/profile.d/conda.sh" >> /opt/nvidia/entrypoint.d/100.conda.sh && \
+    echo "source /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
+    echo "conda activate ${VENV}" >> /opt/nvidia/entrypoint.d/110.conda_default_env.sh && \
+    echo "conda activate ${VENV}" >> $HOME/.bashrc
+
+
+RUN conda config --add channels conda-forge && \
+    conda config --set channel_priority strict
+
+ARG VENV_NAME="cosyvoice"
+ENV VENV=$VENV_NAME
+
+RUN conda create -y -n ${VENV} python=3.10
+ENV CONDA_DEFAULT_ENV=${VENV}
+ENV PATH=/opt/conda/bin:/opt/conda/envs/${VENV}/bin:$PATH
+
+RUN conda activate ${VENV} && conda install -y -c conda-forge pynini==2.1.5
+
 COPY backend/CosyVoice/requirements.txt ./backend/CosyVoice/requirements.txt
-RUN pip install --no-cache-dir -r backend/CosyVoice/requirements.txt
-COPY backend/requirements.txt ./backend/requirements.txt
-RUN pip install --no-cache-dir -r backend/requirements.txt
+RUN sed -i '/^openai-whisper/d' backend/CosyVoice/requirements.txt
+RUN conda activate ${VENV} && \
+    pip install --no-cache-dir git+https://github.com/openai/whisper.git && \
+    pip install --no-cache-dir -r backend/CosyVoice/requirements.txt && \
+    pip install --force-reinstall "setuptools<81"
 
 
 COPY backend ./backend
@@ -30,10 +65,14 @@ ENV PYTHONUNBUFFERED=1
 
 RUN mkdir -p /app/backend/CosyVoice/pretrained_models
 
-# Download the pretrained model during build
-RUN pip install modelscope && \
+RUN conda activate ${VENV} && \
+    pip install modelscope && \
     python -c "from modelscope import snapshot_download; snapshot_download('iic/CosyVoice2-0.5B', local_dir='/app/backend/CosyVoice/pretrained_models/CosyVoice2-0.5B')"
 
 WORKDIR /app/backend
 
-CMD ["uvicorn", "FastAPIdemo:app", "--host", "0.0.0.0", "--port", "8080"]
+RUN chmod +x ./entrypoint-conda.sh
+
+CMD ["./entrypoint-conda.sh"]
+
+
