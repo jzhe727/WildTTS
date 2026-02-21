@@ -68,10 +68,10 @@ class CosyVoiceTTS(BaseTTS):
         if style_text is None:
             raise ValueError("CosyVoice requires style_text parameter")
         
-        prompt_speech_16k = load_wav(prompt_wav_path, 16000)
+        # prompt_speech_16k = load_wav(prompt_wav_path, 16000)
         
         for i, j in enumerate(self.cosyvoice.inference_zero_shot(
-            text, style_text, prompt_speech_16k, stream=stream
+            text, style_text, prompt_wav_path, stream=stream
         )):
             torchaudio.save(
                 output_wav_path.format(i) if '{}' in output_wav_path else output_wav_path,

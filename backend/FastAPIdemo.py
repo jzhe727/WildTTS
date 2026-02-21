@@ -22,6 +22,8 @@ import logging
 from create_model_directory import create_model_directory
 from tts import create_tts, BaseTTS
 
+logging.getLogger().setLevel(logging.DEBUG)  # Cosyvoice uses this logger, so we will as well
+
 app = FastAPI(
     title="Audio API Demo",
     description="Backend API for audio file communication with Unity",
@@ -125,6 +127,7 @@ def get_tts_engine(model: Optional[str] = None) -> BaseTTS:
     if engine_name in _tts_engines:
         return _tts_engines[engine_name]
     
+    logging.info(f"Initializing {engine_name}.")
     # Initialize new engine
     if engine_name == "cosyvoice":
         _tts_engines[engine_name] = create_tts(
@@ -178,7 +181,7 @@ def get_tts_engine(model: Optional[str] = None) -> BaseTTS:
             )
         # Cache the same engine instance for fishaudio_enhance
         _tts_engines[engine_name] = _tts_engines[base_engine]
-    
+    logging.info(f"Engine {engine_name} created.")
     return _tts_engines[engine_name]
 
 
@@ -491,6 +494,7 @@ async def synthesize_and_return(
     except HTTPException:
         raise
     except Exception as e:
+        logging.exception("Synthesis error")
         raise HTTPException(status_code=500, detail=f"Synthesis failed: {str(e)}")
 
 
