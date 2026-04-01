@@ -51,8 +51,8 @@ ENV PATH=/opt/conda/bin:/opt/conda/envs/${VENV}/bin:$PATH
 RUN conda activate ${VENV} && conda install -y -c conda-forge pynini==2.1.5
 
 RUN conda activate ${VENV} && \
-    pip install modelscope && \
-    python -c "from modelscope import snapshot_download; snapshot_download('iic/CosyVoice2-0.5B', local_dir='/app/backend/CosyVoice/pretrained_models/CosyVoice2-0.5B')"
+    pip install --no-cache-dir "huggingface_hub[hf_xet]" && \
+    hf download FunAudioLLM/CosyVoice2-0.5B --local-dir /app/backend/CosyVoice/pretrained_models/CosyVoice2-0.5B
 
 COPY backend/CosyVoice/requirements.txt ./backend/CosyVoice/requirements.txt
 RUN sed -i '/^openai-whisper/d' backend/CosyVoice/requirements.txt
