@@ -13,10 +13,10 @@ on:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  GAR_LOCATION: northamerica-northeast2
-  REPOSITORY: my-app-repo
+  GAR_LOCATION: us-east4
+  REPOSITORY: useast4-app-repo
   SERVICE: wildtts-backend
-  REGION: northamerica-northeast2
+  REGION: us-east4
 
 jobs:
   deploy:
@@ -78,6 +78,8 @@ jobs:
             --port 8080 \
             --memory 8Gi \
             --cpu 8 \
+            --gpu-type nvidia-l4 \
+            --gpu-count 1 \
             --timeout 300 \
             --execution-environment gen2 \
             --set-env-vars "FISH_API_KEY=${{ secrets.FISH_API_KEY }},PYTHONPATH=/app/backend:/app/backend/CosyVoice"
