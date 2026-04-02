@@ -78,7 +78,7 @@ jobs:
             --max 1 \
             --min 0 \
             --port 8080 \
-            --memory 8Gi \
+            --memory 16Gi \
             --cpu 8 \
             --gpu-type nvidia-l4 \
             --gpu 1 \
