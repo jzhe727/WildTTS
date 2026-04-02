@@ -5,6 +5,9 @@ WORKDIR /app
 
 COPY backend ./backend
 
+RUN conda activate ${VENV} && \
+    pip install --no-cache-dir -r backend/requirements.txt
+
 ENV PORT=8080
 ENV PYTHONUNBUFFERED=1
 
