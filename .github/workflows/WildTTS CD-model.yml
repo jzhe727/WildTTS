@@ -68,7 +68,7 @@ jobs:
 
       - name: Build/Push model-base image (only if not exists)
         run: |
-          if gcloud artifacts docker images describe "${{ env.BASE_IMAGE_URI }}" --location="${{ env.GAR_LOCATION }}" >/dev/null 2>&1; then
+          if gcloud artifacts docker images describe "${{ env.BASE_IMAGE_URI }}"; then
             echo "Base image exists: ${{ env.BASE_IMAGE_URI }}"
           else
             docker build -f Dockerfile-model-base \
