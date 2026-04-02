@@ -1,0 +1,50 @@
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+
+SHELL ["/bin/bash", "--login", "-c"]
+
+ARG VENV_NAME="cosyvoice"
+ENV VENV=$VENV_NAME
+
+WORKDIR /app
+
+RUN apt-get update -y --fix-missing && \
+    apt-get install -y git build-essential curl wget ffmpeg unzip git-lfs sox libsox-dev espeak-ng libsndfile1 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    git lfs install
+
+# Miniforge
+RUN wget --quiet https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O ~/miniforge.sh && \
+    /bin/bash ~/miniforge.sh -b -p /opt/conda && \
+    rm ~/miniforge.sh && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo "source /opt/conda/etc/profile.d/conda.sh" >> /opt/nvidia/entrypoint.d/100.conda.sh && \
+    echo "source /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
+    echo "conda activate ${VENV}" >> /opt/nvidia/entrypoint.d/110.conda_default_env.sh && \
+    echo "conda activate ${VENV}" >> $HOME/.bashrc
+
+RUN conda config --add channels conda-forge && \
+    conda config --set channel_priority strict
+
+RUN conda create -y -n ${VENV} python=3.10
+ENV CONDA_DEFAULT_ENV=${VENV}
+ENV PATH=/opt/conda/bin:/opt/conda/envs/${VENV}/bin:$PATH
+
+RUN conda activate ${VENV} && conda install -y -c conda-forge pynini==2.1.5
+
+COPY backend/CosyVoice/requirements.txt ./backend/CosyVoice/requirements.txt
+RUN sed -i '/^openai-whisper/d' backend/CosyVoice/requirements.txt
+RUN conda activate ${VENV} && \
+    pip install --no-cache-dir "huggingface_hub[hf_xet]" && \
+    pip install --no-cache-dir git+https://github.com/openai/whisper.git && \
+    pip install --no-cache-dir -r backend/CosyVoice/requirements.txt && \
+    pip install --force-reinstall "setuptools<81"
+
+RUN mkdir -p /app/backend/CosyVoice/pretrained_models/CosyVoice2-0.5B
+
+# Pin this to a commit/tag for deterministic caching
+ARG MODEL_REV=main
+RUN conda activate ${VENV} && \
+    hf download FunAudioLLM/CosyVoice2-0.5B \
+      --revision ${MODEL_REV} \
+      --local-dir /app/backend/CosyVoice/pretrained_models/CosyVoice2-0.5B
