@@ -75,11 +75,13 @@ jobs:
             --image ${{ env.IMAGE_URI }} \
             --region ${{ env.REGION }} \
             --allow-unauthenticated \
+            --max 1 \
+            --min 0 \
             --port 8080 \
             --memory 8Gi \
             --cpu 8 \
             --gpu-type nvidia-l4 \
-            --gpu-count 1 \
+            --gpu 1 \
             --timeout 300 \
             --execution-environment gen2 \
             --set-env-vars "FISH_API_KEY=${{ secrets.FISH_API_KEY }},PYTHONPATH=/app/backend:/app/backend/CosyVoice"
