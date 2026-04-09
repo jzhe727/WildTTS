@@ -93,9 +93,6 @@ def get_supported_models_list() -> list[str]:
     return BASE_SUPPORTED_MODELS + get_finetuned_campplus_models()
 
 
-# For backwards compatibility
-SUPPORTED_MODELS = BASE_SUPPORTED_MODELS
-
 
 def get_tts_engine(model: Optional[str] = None) -> BaseTTS:
     """
@@ -443,7 +440,7 @@ async def synthesize_and_return(
                 status_code=400,
                 detail="Text input is required for synthesis"
             )
-        
+        SUPPORTED_MODELS = get_supported_models_list()
         # Validate model if provided
         if model and model.lower() not in SUPPORTED_MODELS:
             raise HTTPException(

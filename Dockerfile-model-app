@@ -1,0 +1,17 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+WORKDIR /app
+
+COPY backend ./backend
+
+RUN conda activate ${VENV} && \
+    pip install --no-cache-dir -r backend/requirements.txt
+
+ENV PORT=8080
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app/backend
+RUN chmod +x ./entrypoint-conda.sh
+
+CMD ["./entrypoint-conda.sh"]
