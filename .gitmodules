@@ -7,3 +7,6 @@
 [submodule "eval/versa"]
 	path = eval/versa
 	url = https://github.com/wavlab-speech/versa.git
+[submodule "wildtts_web_frontend"]
+	path = wildtts_web_frontend
+	url = https://github.com/jzhe727/wiltdtts_web_frontend.git
