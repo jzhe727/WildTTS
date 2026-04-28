@@ -9,6 +9,7 @@ Unity Functions Supported:
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import shutil
 import uvicorn
@@ -29,6 +30,21 @@ app = FastAPI(
     description="Backend API for audio file communication with Unity",
     version="3.0.0"
 )
+
+origins = [
+    "http://localhost:3000",
+    "https://ttsdemos.netlify.app/", 
+]
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
+)
+
 
 # Directories for audio files
 UPLOAD_DIR = Path("uploaded_audio")
