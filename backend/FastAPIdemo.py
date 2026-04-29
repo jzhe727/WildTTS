@@ -33,7 +33,8 @@ app = FastAPI(
 
 origins = [
     "http://localhost:3000",
-    "https://ttsdemos.netlify.app/", 
+    "http://127.0.0.1:3000",
+    "https://ttsdemos.netlify.app", 
 ]
 
 # Add CORS middleware
